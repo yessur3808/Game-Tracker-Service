@@ -1,0 +1,24 @@
+# OS metadata
+.DS_Store
+
+# Dependency directory
+node_modules
+
+# env
+.env**
+!.env.example
+!.env.vitest.*
+
+# Ignore built ts files
+dist
+
+# Generated Reports
+coverage
+generated
+
+# vscode
+.vscode
+.vscode/*
+
+# JetBrains
+.idea
