@@ -1,21 +1,11 @@
 import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
-import { ConfigModule } from "./config.module";
-import { DbModule } from "./db.module";
-import { AuditModule } from "./audit/module";
-import { GamesModule } from "./games/module";
-import { AdminModule } from "./admin/module";
-import { IngestionModule } from "./ingestion/module";
+import { ConfigModule } from "@nestjs/config";
 
 @Module({
   imports: [
-    ConfigModule,
-    DbModule,
-    ScheduleModule.forRoot(),
-    AuditModule,
-    GamesModule,
-    AdminModule,
-    IngestionModule,
+    ConfigModule.forRoot({
+      isGlobal: true, // so you don't re-import everywhere
+    }),
   ],
 })
 export class AppModule {}

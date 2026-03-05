@@ -15,6 +15,7 @@
   "type": "commonjs",
   "dependencies": {
     "@nestjs/common": "^11.1.12",
+    "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.12",
     "@nestjs/platform-express": "^11.1.12",
     "@nestjs/schedule": "^6.1.0",
