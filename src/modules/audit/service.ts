@@ -12,6 +12,7 @@ export type AuditEvent = {
   action:
     | "game.create"
     | "game.patch"
+    | "game.delete"
     | "manual_source.create"
     | "manual_source.patch"
     | "manual_source.delete"

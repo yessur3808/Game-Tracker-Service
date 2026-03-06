@@ -30,6 +30,13 @@ export class OverridesService {
     return this.col().findOne({ gameId, enabled: true }) as any;
   }
 
+  async listByGameId(gameId: string) {
+    return this.col()
+      .find({ gameId })
+      .sort({ updatedAt: -1 })
+      .toArray();
+  }
+
   // allowlist validation: only allow overriding certain top-level keys
   private validatePatch(patch: Partial<Game>) {
     const allowedTop = new Set([

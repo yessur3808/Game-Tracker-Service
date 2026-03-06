@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, NotFoundException, Param, Query } from "@nestjs/common";
 import { GamesService } from "./service";
 
 @Controller("/games")
@@ -20,9 +20,18 @@ export class GamesController {
     });
   }
 
+  @Get("/search")
+  async search(@Query("q") q?: string, @Query("limit") limit?: string) {
+    if (!q?.trim()) return [];
+    return this.games.searchByName(q.trim(), {
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   @Get("/:id")
   async get(@Param("id") id: string) {
     const g = await this.games.getComposedById(id);
-    return g ?? { error: "not_found" };
+    if (!g) throw new NotFoundException("Game not found");
+    return g;
   }
 }

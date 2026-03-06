@@ -96,6 +96,8 @@ export class IgdbProvider {
     const text = await fetchTextWithRetry(
       url,
       {
+        method: "POST",
+        body,
         timeoutMs: this.timeoutMs,
         maxRetries: this.maxRetries,
         headers: {
@@ -116,14 +118,21 @@ export class IgdbProvider {
     if (this.token && now < this.token.expiresAtMs - 60_000)
       return this.token.value;
 
-    const url = new URL("https://id.twitch.tv/oauth2/token");
-    url.searchParams.set("client_id", this.clientId);
-    url.searchParams.set("client_secret", this.clientSecret);
-    url.searchParams.set("grant_type", "client_credentials");
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      grant_type: "client_credentials",
+    });
 
     const text = await fetchTextWithRetry(
-      url.toString(),
-      { timeoutMs: this.timeoutMs, maxRetries: this.maxRetries },
+      "https://id.twitch.tv/oauth2/token",
+      {
+        method: "POST",
+        body: params.toString(),
+        timeoutMs: this.timeoutMs,
+        maxRetries: this.maxRetries,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      },
       this.logger,
     );
     const json = JSON.parse(text) as TwitchTokenResponse;

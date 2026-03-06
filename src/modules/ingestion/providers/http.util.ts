@@ -4,6 +4,8 @@ export type FetchJsonOptions = {
   timeoutMs?: number;
   maxRetries?: number;
   headers?: Record<string, string>;
+  method?: "GET" | "POST";
+  body?: string;
 };
 
 export class ProviderHttpError extends Error {
@@ -54,7 +56,9 @@ export async function fetchTextWithRetry(
 
     try {
       const res = await fetch(url, {
+        method: opts.method ?? "GET",
         headers: opts.headers,
+        body: opts.body,
         signal: controller.signal,
       });
 
