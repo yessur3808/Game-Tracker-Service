@@ -2,6 +2,13 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { fetchTextWithRetry } from "./http.util";
 import { ProviderResult } from "./types";
+import { validateProviderUrl } from "./url.util";
+
+const PLAYSTATION_ALLOWED_HOSTS = [
+  "playstation.com",
+  "store.playstation.com",
+  "www.playstation.com",
+];
 
 @Injectable()
 export class PlayStationProvider {
@@ -9,6 +16,8 @@ export class PlayStationProvider {
   constructor(private readonly config: ConfigService) {}
 
   async fetchByUrl(url: string): Promise<ProviderResult> {
+    validateProviderUrl(url, PLAYSTATION_ALLOWED_HOSTS);
+
     const timeoutMs = this.config.get<number>("INGESTION_TIMEOUT_MS") ?? 12_000;
     const maxRetries = this.config.get<number>("INGESTION_MAX_RETRIES") ?? 2;
     const ua =

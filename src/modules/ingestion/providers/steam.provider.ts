@@ -1,4 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { fetchJsonWithRetry, ProviderHttpError } from "./http.util";
+import { ProviderResult } from "./types";
+
+export { ProviderHttpError };
 
 type SteamAppDetailsResponse = Record<
   string,
@@ -11,7 +16,6 @@ type SteamAppDetailsResponse = Record<
       platforms?: { windows?: boolean; mac?: boolean; linux?: boolean };
       header_image?: string;
       website?: string;
-      // lots more exists, but keep it minimal
     };
   }
 >;
@@ -21,39 +25,34 @@ export type SteamAppDetails = NonNullable<
 >;
 
 export type SteamFetchOptions = {
-  cc?: string; // country code, e.g. "us"
-  l?: string; // language, e.g. "en"
+  cc?: string;
+  l?: string;
   timeoutMs?: number;
   maxRetries?: number;
 };
-
-class ProviderHttpError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly url: string,
-  ) {
-    super(message);
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 @Injectable()
 export class SteamProvider {
   private readonly logger = new Logger(SteamProvider.name);
 
-  // You can move these to ConfigService later.
-  private readonly defaultUserAgent =
-    "GameTrackerBot/1.0 (+contact@example.com)";
-  private readonly defaultTimeoutMs = 12_000;
-  private readonly defaultMaxRetries = 2;
+  constructor(private readonly config: ConfigService) {}
+
+  private get userAgent() {
+    return (
+      this.config.get<string>("INGESTION_USER_AGENT") ??
+      "GameTrackerBot/1.0 (+contact@example.com)"
+    );
+  }
+  private get defaultTimeoutMs() {
+    return this.config.get<number>("INGESTION_TIMEOUT_MS") ?? 12_000;
+  }
+  private get defaultMaxRetries() {
+    return this.config.get<number>("INGESTION_MAX_RETRIES") ?? 2;
+  }
 
   async fetchByAppId(appId: number, opts: SteamFetchOptions = {}) {
-    const cc = opts.cc ?? "us";
-    const l = opts.l ?? "en";
+    const cc = opts.cc ?? this.config.get<string>("DEFAULT_STORE_REGION") ?? "us";
+    const l = opts.l ?? this.config.get<string>("DEFAULT_STORE_LANGUAGE") ?? "en";
     const timeoutMs = opts.timeoutMs ?? this.defaultTimeoutMs;
     const maxRetries = opts.maxRetries ?? this.defaultMaxRetries;
 
@@ -61,8 +60,18 @@ export class SteamProvider {
       String(appId),
     )}&cc=${encodeURIComponent(cc)}&l=${encodeURIComponent(l)}`;
 
-    const data = await this.fetchJsonWithRetry(url, timeoutMs, maxRetries);
-    const json = data as SteamAppDetailsResponse;
+    const json = await fetchJsonWithRetry<SteamAppDetailsResponse>(
+      url,
+      {
+        timeoutMs,
+        maxRetries,
+        headers: {
+          "User-Agent": this.userAgent,
+          Accept: "application/json,text/plain,*/*",
+        },
+      },
+      this.logger,
+    );
 
     const entry = json[String(appId)];
     if (!entry?.success || !entry.data) {
@@ -71,122 +80,29 @@ export class SteamProvider {
     return entry.data;
   }
 
-  /**
-   * Optional helper: normalize into a stable internal shape.
-   * (This is NOT your frontend schema yet; just a cleaner provider output.)
-   */
-  async fetchNormalized(appId: number, opts: SteamFetchOptions = {}) {
+  async fetchNormalized(
+    appId: number,
+    opts: SteamFetchOptions = {},
+  ): Promise<ProviderResult> {
     const data = await this.fetchByAppId(appId, opts);
 
-    const platforms = {
-      windows: !!data.platforms?.windows,
-      mac: !!data.platforms?.mac,
-      linux: !!data.platforms?.linux,
-    };
+    const platformTags: string[] = [];
+    if (data.platforms?.windows) platformTags.push("pc");
+    if (data.platforms?.mac) platformTags.push("mac");
+    if (data.platforms?.linux) platformTags.push("linux");
 
     const releaseText = data.release_date?.date?.trim() || null;
-    const comingSoon = !!data.release_date?.coming_soon;
 
     return {
-      provider: "steam" as const,
-      appId,
-      name: data.name ?? null,
-      headerImage: data.header_image ?? null,
-      website: data.website ?? null,
-      platforms,
-      releaseText,
-      comingSoon,
+      provider: "steam",
       fetchedAt: new Date().toISOString(),
-      storeUrl: `https://store.steampowered.com/app/${appId}/`,
+      externalId: appId,
+      url: `https://store.steampowered.com/app/${appId}/`,
+      name: data.name ?? null,
+      releaseText,
+      releaseDateISO: null,
+      platforms: platformTags,
+      coverUrl: data.header_image ?? null,
     };
   }
-
-  private async fetchJsonWithRetry(
-    url: string,
-    timeoutMs: number,
-    maxRetries: number,
-  ): Promise<unknown> {
-    let attempt = 0;
-
-    while (true) {
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), timeoutMs);
-
-      try {
-        const res = await fetch(url, {
-          headers: {
-            "User-Agent": this.defaultUserAgent,
-            Accept: "application/json,text/plain,*/*",
-          },
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          // Retry on rate limit or transient server issues
-          const retryable =
-            res.status === 429 || (res.status >= 500 && res.status <= 599);
-
-          const bodySnippet = await safeText(res);
-          const err = new ProviderHttpError(
-            `Steam HTTP ${res.status} (${retryable ? "retryable" : "fatal"}): ${bodySnippet}`,
-            res.status,
-            url,
-          );
-
-          if (retryable && attempt < maxRetries) {
-            const backoff = 400 * Math.pow(2, attempt);
-            this.logger.warn(
-              `Steam fetch retry ${attempt + 1}/${maxRetries} in ${backoff}ms: ${url}`,
-            );
-            attempt++;
-            await sleep(backoff);
-            continue;
-          }
-
-          throw err;
-        }
-
-        return await res.json();
-      } catch (e: any) {
-        const isAbort = e?.name === "AbortError";
-
-        // Network/timeout retry
-        if (
-          (isAbort || (await isLikelyNetworkError(e))) &&
-          attempt < maxRetries
-        ) {
-          const backoff = 400 * Math.pow(2, attempt);
-          this.logger.warn(
-            `Steam fetch network/timeout retry ${attempt + 1}/${maxRetries} in ${backoff}ms: ${url}`,
-          );
-          attempt++;
-          await sleep(backoff);
-          continue;
-        }
-
-        throw e;
-      } finally {
-        clearTimeout(t);
-      }
-    }
-  }
 }
-
-const safeText = async (res: Response) => {
-  try {
-    const txt = await res.text();
-    return txt.slice(0, 500);
-  } catch {
-    return "";
-  }
-};
-
-const isLikelyNetworkError = async (e: any) => {
-  const msg = String(e?.message || "");
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("ECONNRESET") ||
-    msg.includes("ENOTFOUND") ||
-    msg.includes("ETIMEDOUT")
-  );
-};

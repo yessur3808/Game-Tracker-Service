@@ -2,6 +2,21 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { fetchTextWithRetry } from "./http.util";
 import { ProviderResult } from "./types";
+import { validateProviderUrl } from "./url.util";
+
+const NINTENDO_ALLOWED_HOSTS = [
+  "nintendo.com",
+  "nintendo.co.uk",
+  "nintendo.co.jp",
+  "nintendo.de",
+  "nintendo.fr",
+  "nintendo.es",
+  "nintendo.it",
+  "nintendo.nl",
+  "nintendo.pt",
+  "nintendo.com.au",
+  "nintendo-europe.com",
+];
 
 @Injectable()
 export class NintendoProvider {
@@ -9,6 +24,8 @@ export class NintendoProvider {
   constructor(private readonly config: ConfigService) {}
 
   async fetchByUrl(url: string): Promise<ProviderResult> {
+    validateProviderUrl(url, NINTENDO_ALLOWED_HOSTS);
+
     const timeoutMs = this.config.get<number>("INGESTION_TIMEOUT_MS") ?? 12_000;
     const maxRetries = this.config.get<number>("INGESTION_MAX_RETRIES") ?? 2;
     const ua =
