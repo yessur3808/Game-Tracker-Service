@@ -168,10 +168,11 @@ export class GamesService {
       .limit(limit)
       .toArray();
 
-    const out: Game[] = [];
-    for (const d of docs) {
-      out.push((await this.getComposedById((d as any).id))!);
-    }
+    const out = await Promise.all(
+      docs.map((d) =>
+        this.getComposedById((d as any).id) as Promise<Game>,
+      ),
+    );
     return out;
   }
 
