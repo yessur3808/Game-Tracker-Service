@@ -134,7 +134,10 @@ export class GamesService {
     availability?: string;
     limit?: number;
   }): Promise<Game[]> {
-    const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
+    const rawLimit = params.limit;
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit!, 1), 200)
+      : 50;
 
     const filter: any = {};
     if (params.platform) filter.platforms = params.platform;
@@ -160,7 +163,10 @@ export class GamesService {
     query: string,
     params: { limit?: number } = {},
   ): Promise<Game[]> {
-    const limit = Math.min(Math.max(params.limit ?? 20, 1), 100);
+    const rawLimit = params.limit;
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit!, 1), 100)
+      : 20;
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const docs = await this.gamesCol()
       .find({ name: { $regex: escapedQuery, $options: "i" } })
