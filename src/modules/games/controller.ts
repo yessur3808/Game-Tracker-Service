@@ -1,5 +1,11 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, NotFoundException, Param, Query } from "@nestjs/common";
 import { GamesService } from "./service";
+
+function parseQueryLimit(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 @Controller("/games")
 export class GamesController {
@@ -16,13 +22,22 @@ export class GamesController {
       platform,
       categoryType,
       availability,
-      limit: limit ? Number(limit) : undefined,
+      limit: parseQueryLimit(limit),
+    });
+  }
+
+  @Get("/search")
+  async search(@Query("q") q?: string, @Query("limit") limit?: string) {
+    if (!q?.trim()) return [];
+    return this.games.searchByName(q.trim(), {
+      limit: parseQueryLimit(limit),
     });
   }
 
   @Get("/:id")
   async get(@Param("id") id: string) {
     const g = await this.games.getComposedById(id);
-    return g ?? { error: "not_found" };
+    if (!g) throw new NotFoundException("Game not found");
+    return g;
   }
 }

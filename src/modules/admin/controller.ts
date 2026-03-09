@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  Delete,
+  Get,
   Param,
   Patch,
   Post,
@@ -9,12 +11,18 @@ import {
 } from "@nestjs/common";
 import { AdminGuard } from "./guard";
 import { GamesService } from "../games/service";
+import { ManualSourcesService } from "../manual-sources/service";
+import { OverridesService } from "../overrides/service";
 import { Game } from "../../shared/types";
 
 @Controller("/admin")
 @UseGuards(AdminGuard)
 export class AdminController {
-  constructor(private readonly games: GamesService) {}
+  constructor(
+    private readonly games: GamesService,
+    private readonly manualSources: ManualSourcesService,
+    private readonly overrides: OverridesService,
+  ) {}
 
   @Post("/games")
   async createGame(
@@ -40,6 +48,29 @@ export class AdminController {
       reason: body.reason,
       request: pickReq(req),
     });
+  }
+
+  @Delete("/games/:id")
+  async deleteGame(
+    @Param("id") id: string,
+    @Body() body: { reason?: string },
+    @Req() req: any,
+  ) {
+    return this.games.deleteGame(id, {
+      actorId: req.adminActorId,
+      reason: body?.reason,
+      request: pickReq(req),
+    });
+  }
+
+  @Get("/games/:id/overrides")
+  async listOverrides(@Param("id") id: string) {
+    return this.overrides.listByGameId(id);
+  }
+
+  @Get("/games/:id/manual-sources")
+  async listManualSources(@Param("id") id: string) {
+    return this.manualSources.listByGameId(id);
   }
 }
 

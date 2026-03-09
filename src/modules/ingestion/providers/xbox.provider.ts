@@ -2,6 +2,9 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { fetchTextWithRetry } from "./http.util";
 import { ProviderResult } from "./types";
+import { validateProviderUrl } from "./url.util";
+
+const XBOX_ALLOWED_HOSTS = ["xbox.com", "microsoft.com", "www.xbox.com"];
 
 @Injectable()
 export class XboxProvider {
@@ -9,6 +12,8 @@ export class XboxProvider {
   constructor(private readonly config: ConfigService) {}
 
   async fetchByUrl(url: string): Promise<ProviderResult> {
+    validateProviderUrl(url, XBOX_ALLOWED_HOSTS);
+
     const timeoutMs = this.config.get<number>("INGESTION_TIMEOUT_MS") ?? 12_000;
     const maxRetries = this.config.get<number>("INGESTION_MAX_RETRIES") ?? 2;
     const ua =

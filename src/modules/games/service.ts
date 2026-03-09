@@ -134,7 +134,10 @@ export class GamesService {
     availability?: string;
     limit?: number;
   }): Promise<Game[]> {
-    const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
+    const rawLimit = params.limit;
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit!, 1), 200)
+      : 50;
 
     const filter: any = {};
     if (params.platform) filter.platforms = params.platform;
@@ -154,6 +157,52 @@ export class GamesService {
       out.push((await this.getComposedById((d as any).id))!);
     }
     return out;
+  }
+
+  async searchByName(
+    query: string,
+    params: { limit?: number } = {},
+  ): Promise<Game[]> {
+    const rawLimit = params.limit;
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit!, 1), 100)
+      : 20;
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const docs = await this.gamesCol()
+      .find({ name: { $regex: escapedQuery, $options: "i" } })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    const out = await Promise.all(
+      docs.map((d) =>
+        this.getComposedById((d as any).id) as Promise<Game>,
+      ),
+    );
+    return out;
+  }
+
+  async deleteGame(
+    id: string,
+    ctx: { actorId: string; reason?: string; request?: any },
+  ) {
+    const now = new Date().toISOString();
+    const before = await this.gamesCol().findOne({ id });
+    if (!before) throw new NotFoundException("Game not found");
+
+    await this.gamesCol().deleteOne({ id });
+
+    await this.audit.append({
+      at: now,
+      actor: { type: "admin", id: ctx.actorId },
+      action: "game.delete",
+      entity: { type: "game", id },
+      reason: ctx.reason,
+      before: { id, name: (before as any).name },
+      request: ctx.request,
+    });
+
+    return { ok: true };
   }
 
   // Used by ingestion later
