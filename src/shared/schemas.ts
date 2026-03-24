@@ -27,8 +27,8 @@ export const SourceSchema = z.object({
   excerpt: z.string().max(2000).optional(),
   claim: z.string().max(1000).optional(),
   authorHandle: z.string().optional(),
-  /** Credibility score 1 (least) – 10 (most); optional, curator-assigned */
-  credibilityScore: z.number().int().min(1).max(10).optional(),
+  /** Credibility score 1 (least) – 100 (most); optional, curator-assigned */
+  credibilityScore: z.number().int().min(1).max(100).optional(),
   /** ISO-8601 timestamp of the last automated health-check of this source URL */
   lastCheckedAt: z.string().optional(),
   /** How many times this source has been verified / re-scraped */
