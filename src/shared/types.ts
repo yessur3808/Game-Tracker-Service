@@ -24,6 +24,8 @@ export type Source = {
   claim?: string;
   /** For social sources — e.g. "@FortniteGame" */
   authorHandle?: string;
+  /** Credibility score 1 (least) – 10 (most); optional, curator-assigned */
+  credibilityScore?: number;
 };
 
 export type DatePrecision = "day" | "month" | "quarter" | "year" | "unknown";

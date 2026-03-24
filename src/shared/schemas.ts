@@ -24,6 +24,8 @@ export const SourceSchema = z.object({
   excerpt: z.string().optional(),
   claim: z.string().optional(),
   authorHandle: z.string().optional(),
+  /** Credibility score 1 (least) – 10 (most); optional, curator-assigned */
+  credibilityScore: z.number().int().min(1).max(10).optional(),
 });
 
 export const CategorySchema = z.object({
