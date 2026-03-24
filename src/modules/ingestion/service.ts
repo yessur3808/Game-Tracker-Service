@@ -166,6 +166,7 @@ export class IngestionService {
 
   /**
    * Determine which provider to use for a URL and fetch through it.
+   * Uses proper hostname suffix matching to prevent spoofing.
    */
   private async fetchFromSourceUrl(
     url: string,
@@ -173,22 +174,22 @@ export class IngestionService {
     try {
       const host = new URL(url).hostname.toLowerCase();
 
-      if (host.includes("steampowered.com")) {
+      if (hostMatches(host, ["steampowered.com", "store.steampowered.com"])) {
         const appIdMatch = url.match(/\/app\/(\d+)/);
         if (appIdMatch) {
           return await this.steam.fetchNormalized(Number(appIdMatch[1]));
         }
       }
-      if (host.includes("epicgames.com")) {
+      if (hostMatches(host, ["epicgames.com", "store.epicgames.com"])) {
         return await this.epic.fetchByUrl(url);
       }
-      if (host.includes("playstation.com")) {
+      if (hostMatches(host, ["playstation.com", "store.playstation.com"])) {
         return await this.playstation.fetchByUrl(url);
       }
-      if (host.includes("xbox.com") || host.includes("microsoft.com")) {
+      if (hostMatches(host, ["xbox.com", "microsoft.com"])) {
         return await this.xbox.fetchByUrl(url);
       }
-      if (host.includes("nintendo.com") || host.includes("nintendo-europe.com")) {
+      if (hostMatches(host, ["nintendo.com", "nintendo-europe.com"])) {
         return await this.nintendo.fetchByUrl(url);
       }
     } catch {
@@ -228,4 +229,9 @@ export class IngestionService {
       },
     );
   }
+}
+
+/** Check if hostname exactly equals or is a subdomain of any allowed suffix */
+function hostMatches(host: string, suffixes: string[]): boolean {
+  return suffixes.some((s) => host === s || host.endsWith(`.${s}`));
 }

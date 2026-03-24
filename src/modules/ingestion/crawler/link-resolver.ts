@@ -87,12 +87,13 @@ export class LinkResolverService {
       const batchResults = await Promise.allSettled(
         batch.map((url) => this.resolve(url)),
       );
-      for (const r of batchResults) {
+      for (let j = 0; j < batchResults.length; j++) {
+        const r = batchResults[j];
         if (r.status === "fulfilled") {
           results.push(r.value);
         } else {
           results.push({
-            url: batch[batchResults.indexOf(r)] ?? "unknown",
+            url: batch[j] ?? "unknown",
             resolved: false,
             error: String(r.reason),
           });

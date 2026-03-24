@@ -65,13 +65,28 @@ function projectGame(game: any, fields: Set<string> | null): any {
   return out;
 }
 
-/** Compute a weak ETag from a JSON payload */
+/** Compute a weak ETag from a JSON payload with deterministic key ordering */
 function computeETag(body: unknown): string {
   const hash = createHash("md5")
-    .update(JSON.stringify(body))
+    .update(stableStringify(body))
     .digest("hex")
     .slice(0, 16);
   return `W/"${hash}"`;
+}
+
+/** JSON.stringify with sorted keys for deterministic output */
+function stableStringify(obj: unknown): string {
+  return JSON.stringify(obj, (_key, value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return Object.keys(value)
+        .sort()
+        .reduce<Record<string, unknown>>((sorted, k) => {
+          sorted[k] = value[k];
+          return sorted;
+        }, {});
+    }
+    return value;
+  });
 }
 
 @Controller("/games")

@@ -177,20 +177,28 @@ function slugify(text: string): string {
 /**
  * Classify a URL to one of the known provider keys, or null if
  * it doesn't match a known store domain.
+ * Uses proper hostname suffix matching to prevent spoofing.
  */
 function classifyUrl(url: string): string | null {
   try {
     const host = new URL(url).hostname.toLowerCase();
-    if (host.includes("steampowered.com") || host.includes("store.steampowered.com"))
+    if (matchHost(host, ["steampowered.com", "store.steampowered.com"]))
       return "steam";
-    if (host.includes("epicgames.com")) return "epic";
-    if (host.includes("playstation.com")) return "playstation";
-    if (host.includes("xbox.com") || host.includes("microsoft.com"))
+    if (matchHost(host, ["epicgames.com", "store.epicgames.com"]))
+      return "epic";
+    if (matchHost(host, ["playstation.com", "store.playstation.com"]))
+      return "playstation";
+    if (matchHost(host, ["xbox.com", "microsoft.com"]))
       return "xbox";
-    if (host.includes("nintendo.com") || host.includes("nintendo-europe.com"))
+    if (matchHost(host, ["nintendo.com", "nintendo-europe.com"]))
       return "nintendo";
   } catch {
     // invalid URL
   }
   return null;
+}
+
+/** Check if hostname exactly equals or is a subdomain of any allowed suffix */
+function matchHost(host: string, suffixes: string[]): boolean {
+  return suffixes.some((s) => host === s || host.endsWith(`.${s}`));
 }

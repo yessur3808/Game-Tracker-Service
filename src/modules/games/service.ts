@@ -309,10 +309,27 @@ export class GamesService {
     const gameData = parsed.data as any;
     for (const key of Object.keys(gameData)) {
       if (key === "id" || key === "createdAt") continue;
-      const oldVal = JSON.stringify((existing as any)[key]);
-      const newVal = JSON.stringify(gameData[key]);
-      if (oldVal !== newVal) {
-        patch[key] = gameData[key];
+      const oldVal = (existing as any)[key];
+      const newVal = gameData[key];
+
+      // Fast path for primitives; fallback to JSON for objects/arrays
+      let changed: boolean;
+      if (
+        oldVal === newVal ||
+        (oldVal == null && newVal == null)
+      ) {
+        changed = false;
+      } else if (
+        typeof oldVal !== "object" &&
+        typeof newVal !== "object"
+      ) {
+        changed = oldVal !== newVal;
+      } else {
+        changed = JSON.stringify(oldVal) !== JSON.stringify(newVal);
+      }
+
+      if (changed) {
+        patch[key] = newVal;
       }
     }
 
