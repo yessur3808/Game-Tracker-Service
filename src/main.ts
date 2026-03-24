@@ -5,7 +5,18 @@ import { AppModule } from "./modules/app.module";
 import { AllExceptionsFilter } from "./shared/all-exceptions.filter";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
+
+  // Allow configuring the allowed CORS origin(s) via CORS_ORIGIN env var.
+  // Supports a single origin string, a comma-separated list, or "*" for all.
+  // Falls back to allowing all origins when unset (convenient for local dev).
+  const rawOrigin = process.env.CORS_ORIGIN?.trim();
+  let corsOrigin: string | string[] | boolean = true;
+  if (rawOrigin && rawOrigin !== "*") {
+    const parts = rawOrigin.split(",").map((s) => s.trim()).filter(Boolean);
+    corsOrigin = parts.length === 1 ? parts[0] : parts;
+  }
+  app.enableCors({ origin: corsOrigin });
 
   app.useGlobalPipes(
     new ValidationPipe({

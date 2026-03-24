@@ -40,6 +40,10 @@ async function ensureIndexes(db: Db) {
   await db.collection("games").createIndex({ platforms: 1 });
   await db.collection("games").createIndex({ "category.type": 1 });
   await db.collection("games").createIndex({ updatedAt: -1 });
+  // Text index for name-based search (used by /games/search)
+  await db
+    .collection("games")
+    .createIndex({ name: "text" }, { name: "games_name_text" });
 
   // manual_sources
   await db

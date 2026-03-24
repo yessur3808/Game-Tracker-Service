@@ -112,14 +112,12 @@ export class GamesService {
       ? deepMerge(withSources, override.patch)
       : withSources;
 
-    // recompute derived availability (simple rule)
+    // recompute derived availability
     composed.availability = deriveAvailability(composed);
 
     // validate final (defensive)
     const parsed = GameSchema.safeParse(composed);
     if (!parsed.success) {
-      // If this happens, your manual override/patch broke invariants.
-      // You may prefer to throw, or return base + error.
       throw new BadRequestException({
         message: "Composed game failed validation (check manual override).",
         issues: parsed.error.flatten(),
@@ -133,11 +131,13 @@ export class GamesService {
     categoryType?: string;
     availability?: string;
     limit?: number;
+    skip?: number;
   }): Promise<Game[]> {
     const rawLimit = params.limit;
     const limit = Number.isFinite(rawLimit)
       ? Math.min(Math.max(rawLimit!, 1), 200)
       : 50;
+    const skip = Number.isFinite(params.skip) ? Math.max(params.skip!, 0) : 0;
 
     const filter: any = {};
     if (params.platform) filter.platforms = params.platform;
@@ -147,16 +147,11 @@ export class GamesService {
     const docs = await this.gamesCol()
       .find(filter)
       .sort({ updatedAt: -1 })
+      .skip(skip)
       .limit(limit)
       .toArray();
 
-    // compose each (manual sources + overrides)
-    // For small N (<=200), this is fine. Later you can batch-load overrides/sources.
-    const out: Game[] = [];
-    for (const d of docs) {
-      out.push((await this.getComposedById((d as any).id))!);
-    }
-    return out;
+    return this.batchCompose(docs);
   }
 
   async searchByName(
@@ -174,11 +169,71 @@ export class GamesService {
       .limit(limit)
       .toArray();
 
-    const out = await Promise.all(
-      docs.map((d) =>
-        this.getComposedById((d as any).id) as Promise<Game>,
-      ),
-    );
+    return this.batchCompose(docs);
+  }
+
+  /**
+   * Batch-loads manual sources and overrides for a set of game docs and
+   * composes each game in-memory. Reduces DB round-trips from O(3N) to O(3).
+   */
+  private async batchCompose(docs: any[]): Promise<Game[]> {
+    if (docs.length === 0) return [];
+
+    const ids = docs.map((d) => d.id as string);
+
+    // Two queries replace the N+1 pattern: one for manual sources, one for overrides
+    const [allManualLinks, allOverrides] = await Promise.all([
+      this.db
+        .collection("manual_sources")
+        .find({ gameId: { $in: ids } })
+        .sort({ createdAt: -1 })
+        .toArray(),
+      this.db
+        .collection("manual_overrides")
+        .find({ gameId: { $in: ids }, enabled: true })
+        .toArray(),
+    ]);
+
+    // Group by gameId for O(1) lookup per game
+    const manualLinksByGame = new Map<string, any[]>();
+    for (const link of allManualLinks) {
+      const arr = manualLinksByGame.get(link.gameId) ?? [];
+      arr.push(link);
+      manualLinksByGame.set(link.gameId, arr);
+    }
+
+    const overrideByGame = new Map<string, any>();
+    for (const ov of allOverrides) {
+      overrideByGame.set(ov.gameId, ov);
+    }
+
+    const out: Game[] = [];
+    for (const doc of docs) {
+      const id = doc.id as string;
+      const gameManualLinks = manualLinksByGame.get(id) ?? [];
+      const gameOverride = overrideByGame.get(id) ?? null;
+
+      const withSources = applyManualSources(
+        doc,
+        gameManualLinks.map((x: any) => x.source),
+        gameManualLinks,
+      );
+
+      const composed = gameOverride
+        ? deepMerge(withSources, gameOverride.patch)
+        : withSources;
+
+      composed.availability = deriveAvailability(composed);
+
+      const parsed = GameSchema.safeParse(composed);
+      if (!parsed.success) {
+        throw new BadRequestException({
+          message: `Composed game "${id}" failed validation (check manual override).`,
+          issues: parsed.error.flatten(),
+        });
+      }
+      out.push(parsed.data);
+    }
     return out;
   }
 
@@ -257,12 +312,17 @@ export class GamesService {
   }
 }
 
-function deriveAvailability(g: any): "upcoming" | "released" | "unknown" {
+function deriveAvailability(
+  g: any,
+): "upcoming" | "released" | "cancelled" | "unknown" {
   if (g?.release?.status === "released") return "released";
+  if (g?.release?.status === "canceled") return "cancelled";
   if (
     g?.release?.status === "upcoming" ||
     g?.release?.status === "announced" ||
-    g?.release?.status === "delayed"
+    g?.release?.status === "delayed" ||
+    g?.release?.status === "recurring_daily" ||
+    g?.release?.status === "recurring_weekly"
   ) {
     return "upcoming";
   }
@@ -275,36 +335,47 @@ function applyManualSources(
   manualSources: any[],
   manualLinks: any[],
 ) {
+  // Use url as dedup key; sources without a url are always included
   const existingUrls = new Set<string>(
-    (base.sources ?? []).map((s: any) => s.url),
+    (base.sources ?? [])
+      .filter((s: any) => s.url != null)
+      .map((s: any) => s.url as string),
   );
   const mergedSources = [...(base.sources ?? [])];
 
   for (const s of manualSources) {
-    if (!existingUrls.has(s.url)) {
+    if (s.url == null || !existingUrls.has(s.url)) {
       mergedSources.push(s);
-      existingUrls.add(s.url);
+      if (s.url != null) existingUrls.add(s.url);
     }
   }
 
   // Optional: scope manual sources into release / seasonWindow
   const releaseSources = [...(base.release?.sources ?? [])];
-  const releaseUrls = new Set<string>(releaseSources.map((s: any) => s.url));
+  const releaseUrls = new Set<string>(
+    releaseSources
+      .filter((s: any) => s.url != null)
+      .map((s: any) => s.url as string),
+  );
 
   const seasonSources = [...(base.seasonWindow?.current?.sources ?? [])];
-  const seasonUrls = new Set<string>(seasonSources.map((s: any) => s.url));
+  const seasonUrls = new Set<string>(
+    seasonSources
+      .filter((s: any) => s.url != null)
+      .map((s: any) => s.url as string),
+  );
 
   for (const link of manualLinks) {
     const s = link.source;
     if (link.scope === "release") {
-      if (!releaseUrls.has(s.url)) {
+      if (s.url == null || !releaseUrls.has(s.url)) {
         releaseSources.push(s);
-        releaseUrls.add(s.url);
+        if (s.url != null) releaseUrls.add(s.url);
       }
     } else if (link.scope === "seasonWindow") {
-      if (!seasonUrls.has(s.url)) {
+      if (s.url == null || !seasonUrls.has(s.url)) {
         seasonSources.push(s);
-        seasonUrls.add(s.url);
+        if (s.url != null) seasonUrls.add(s.url);
       }
     }
   }
