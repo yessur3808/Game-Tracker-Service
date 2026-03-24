@@ -18,7 +18,7 @@ export type Source = {
   url?: string;
   isOfficial: boolean;
   reliability: "high" | "medium" | "low" | "unknown";
-  /** Optional — not always recorded at ingestion time */
+  /** ISO-8601 timestamp of when this source was last retrieved */
   retrievedAt?: ISODateTime;
   excerpt?: string;
   claim?: string;
@@ -26,6 +26,10 @@ export type Source = {
   authorHandle?: string;
   /** Credibility score 1 (least) – 10 (most); optional, curator-assigned */
   credibilityScore?: number;
+  /** ISO-8601 timestamp of the last automated health-check of this URL */
+  lastCheckedAt?: ISODateTime;
+  /** How many times this source has been verified / re-scraped */
+  checkCount?: number;
 };
 
 export type DatePrecision = "day" | "month" | "quarter" | "year" | "unknown";
@@ -131,11 +135,22 @@ export type PopularityTier =
   | "niche"
   | "unknown_or_rumor";
 
+export type ExternalIds = {
+  steam?: number;
+  igdb?: number;
+  epic?: string;
+  playstation?: string;
+  xbox?: string;
+  nintendo?: string;
+};
+
 export type Game = {
   id: string;
   name: string;
   /** Canonical title — useful when name is a specific release item */
   title?: string;
+  /** Short description of the game */
+  description?: string;
 
   category: Category;
   platforms: string[]; // e.g. ["PC","PS5"]
@@ -153,8 +168,13 @@ export type Game = {
   popularityTier?: PopularityTier;
   popularityRank?: number;
   tags?: string[];
+  /** Genre tags (e.g. ["Action", "RPG"]) */
+  genres?: string[];
 
   sources: Source[];
+
+  /** External platform IDs for cross-referencing / deduplication */
+  externalIds?: ExternalIds;
 
   updatedAt?: ISODateTime; // filled by DB layer
 };

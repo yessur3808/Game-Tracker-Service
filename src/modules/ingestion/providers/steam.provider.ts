@@ -12,10 +12,18 @@ type SteamAppDetailsResponse = Record<
     data?: {
       steam_appid?: number;
       name?: string;
+      short_description?: string;
       release_date?: { coming_soon?: boolean; date?: string };
       platforms?: { windows?: boolean; mac?: boolean; linux?: boolean };
       header_image?: string;
       website?: string;
+      genres?: { id?: string; description?: string }[];
+      price_overview?: {
+        currency?: string;
+        initial?: number;
+        final?: number;
+        final_formatted?: string;
+      };
     };
   }
 >;
@@ -103,6 +111,13 @@ export class SteamProvider {
       releaseDateISO: null,
       platforms: platformTags,
       coverUrl: data.header_image ?? null,
+      description: data.short_description ?? null,
+      price: data.price_overview?.final_formatted ?? null,
+      genres: Array.isArray(data.genres)
+        ? data.genres
+            .map((g: any) => g?.description)
+            .filter((g): g is string => typeof g === "string")
+        : [],
     };
   }
 }

@@ -19,13 +19,20 @@ export const SourceSchema = z.object({
   url: z.string().url().optional(),
   isOfficial: z.boolean(),
   reliability: z.enum(["high", "medium", "low", "unknown"]),
-  /** Optional — not always captured at ingestion time */
-  retrievedAt: z.string().optional(),
-  excerpt: z.string().optional(),
-  claim: z.string().optional(),
+  /** ISO-8601 timestamp of when this source was last retrieved */
+  retrievedAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}/, { message: "retrievedAt must be ISO-8601" })
+    .optional(),
+  excerpt: z.string().max(2000).optional(),
+  claim: z.string().max(1000).optional(),
   authorHandle: z.string().optional(),
   /** Credibility score 1 (least) – 10 (most); optional, curator-assigned */
   credibilityScore: z.number().int().min(1).max(10).optional(),
+  /** ISO-8601 timestamp of the last automated health-check of this source URL */
+  lastCheckedAt: z.string().optional(),
+  /** How many times this source has been verified / re-scraped */
+  checkCount: z.number().int().min(0).optional(),
 });
 
 export const CategorySchema = z.object({
@@ -181,10 +188,24 @@ export const MediaSchema = z.object({
     .optional(),
 });
 
+/** Cross-references to external platform IDs for deduplication */
+export const ExternalIdsSchema = z
+  .object({
+    steam: z.number().int().positive().optional(),
+    igdb: z.number().int().positive().optional(),
+    epic: z.string().optional(),
+    playstation: z.string().optional(),
+    xbox: z.string().optional(),
+    nintendo: z.string().optional(),
+  })
+  .optional();
+
 export const GameSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   title: z.string().optional(),
+  /** Short description of the game */
+  description: z.string().max(5000).optional(),
   category: CategorySchema,
   platforms: z.array(z.string().min(1)).default([]),
   availability: z.enum(["upcoming", "released", "cancelled", "unknown"]),
@@ -218,8 +239,12 @@ export const GameSchema = z.object({
     ])
     .optional(),
   popularityRank: z.number().int().positive().optional(),
-  tags: z.array(z.string()).optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  /** Genre tags (e.g. ["Action", "RPG"]) */
+  genres: z.array(z.string().min(1)).optional(),
   sources: z.array(SourceSchema),
+  /** External platform IDs for cross-referencing / deduplication */
+  externalIds: ExternalIdsSchema,
   updatedAt: z.string().optional(),
 });
 

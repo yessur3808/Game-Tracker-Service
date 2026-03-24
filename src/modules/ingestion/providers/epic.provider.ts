@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { fetchTextWithRetry } from "./http.util";
 import { ProviderResult } from "./types";
 import { validateProviderUrl } from "./url.util";
+import { extractAllFromHtml } from "./html.util";
 
 const EPIC_ALLOWED_HOSTS = ["epicgames.com", "store.epicgames.com"];
 
@@ -33,43 +34,20 @@ export class EpicProvider {
       this.logger,
     );
 
-    const name =
-      extractMetaContent(html, "og:title") ?? extractTitleTag(html) ?? null;
-
-    // Epic often embeds JSON in the page; we keep it conservative as text.
-    const releaseText = extractReleaseLikeText(html);
+    const extracted = extractAllFromHtml(html);
 
     return {
       provider: "epic",
       fetchedAt: new Date().toISOString(),
       url,
-      name,
-      releaseText: releaseText ?? null,
-      releaseDateISO: null,
-      platforms: ["pc"],
-      coverUrl: extractMetaContent(html, "og:image") ?? null,
+      name: extracted.name,
+      releaseText: extracted.releaseText ?? null,
+      releaseDateISO: extracted.releaseDateISO ?? null,
+      platforms: extracted.platforms.length > 0 ? extracted.platforms : ["pc"],
+      coverUrl: extracted.coverUrl ?? null,
+      description: extracted.description ?? null,
+      price: extracted.price ?? null,
+      genres: extracted.genres,
     };
   }
-}
-
-function extractMetaContent(html: string, propertyOrName: string) {
-  const re1 = new RegExp(
-    `<meta\\s+[^>]*(?:property|name)=["']${escapeRegExp(
-      propertyOrName,
-    )}["'][^>]*content=["']([^"']+)["'][^>]*>`,
-    "i",
-  );
-  const m1 = html.match(re1);
-  return m1?.[1]?.trim() ?? null;
-}
-function extractTitleTag(html: string) {
-  const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  return m?.[1]?.trim() ?? null;
-}
-function extractReleaseLikeText(html: string) {
-  const m = html.match(/release\s*date[^<]{0,80}([A-Za-z0-9,\s-]{3,40})/i);
-  return m?.[1]?.trim() ?? null;
-}
-function escapeRegExp(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

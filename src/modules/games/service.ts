@@ -12,6 +12,8 @@ import { GameSchema } from "../../shared/schemas";
 import { ManualSourcesService } from "../manual-sources/service";
 import { OverridesService } from "../overrides/service";
 
+type SortBy = "updatedAt" | "releaseDate" | "releaseDateDesc" | "name";
+
 @Injectable()
 export class GamesService {
   constructor(
@@ -132,7 +134,8 @@ export class GamesService {
     availability?: string;
     limit?: number;
     skip?: number;
-  }): Promise<Game[]> {
+    sortBy?: SortBy;
+  }): Promise<{ games: Game[]; totalCount: number }> {
     const rawLimit = params.limit;
     const limit = Number.isFinite(rawLimit)
       ? Math.min(Math.max(rawLimit!, 1), 200)
@@ -144,32 +147,44 @@ export class GamesService {
     if (params.categoryType) filter["category.type"] = params.categoryType;
     if (params.availability) filter.availability = params.availability;
 
-    const docs = await this.gamesCol()
-      .find(filter)
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
+    const sort = buildSort(params.sortBy);
 
-    return this.batchCompose(docs);
+    const [docs, totalCount] = await Promise.all([
+      this.gamesCol()
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+      this.gamesCol().countDocuments(filter),
+    ]);
+
+    const games = await this.batchCompose(docs);
+    return { games, totalCount };
   }
 
   async searchByName(
     query: string,
     params: { limit?: number } = {},
-  ): Promise<Game[]> {
+  ): Promise<{ games: Game[]; totalCount: number }> {
     const rawLimit = params.limit;
     const limit = Number.isFinite(rawLimit)
       ? Math.min(Math.max(rawLimit!, 1), 100)
       : 20;
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const docs = await this.gamesCol()
-      .find({ name: { $regex: escapedQuery, $options: "i" } })
-      .sort({ updatedAt: -1 })
-      .limit(limit)
-      .toArray();
+    const filter = { name: { $regex: escapedQuery, $options: "i" } };
 
-    return this.batchCompose(docs);
+    const [docs, totalCount] = await Promise.all([
+      this.gamesCol()
+        .find(filter)
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .toArray(),
+      this.gamesCol().countDocuments(filter),
+    ]);
+
+    const games = await this.batchCompose(docs);
+    return { games, totalCount };
   }
 
   /**
@@ -289,10 +304,21 @@ export class GamesService {
       return;
     }
 
-    // naive change detection (improve later)
-    const patch: any = { ...parsed.data, updatedAt: now, lastIngestedAt: now };
-    delete patch.id;
-    delete patch.createdAt;
+    // Smart change detection — only update fields that actually changed
+    const patch: any = {};
+    const gameData = parsed.data as any;
+    for (const key of Object.keys(gameData)) {
+      if (key === "id" || key === "createdAt") continue;
+      const oldVal = JSON.stringify((existing as any)[key]);
+      const newVal = JSON.stringify(gameData[key]);
+      if (oldVal !== newVal) {
+        patch[key] = gameData[key];
+      }
+    }
+
+    // Always update timestamps
+    patch.updatedAt = now;
+    patch.lastIngestedAt = now;
 
     await this.gamesCol().updateOne(
       { id: parsed.data.id },
@@ -302,15 +328,55 @@ export class GamesService {
       },
     );
 
-    await this.audit.append({
-      at: now,
-      actor: { type: "system", id: "ingestion" },
-      action: "ingest.upsert",
-      entity: { type: "game", id: parsed.data.id },
-      changedPaths: Object.keys(patch),
+    const changedKeys = Object.keys(patch).filter(
+      (k) => k !== "updatedAt" && k !== "lastIngestedAt",
+    );
+
+    if (changedKeys.length > 0) {
+      await this.audit.append({
+        at: now,
+        actor: { type: "system", id: "ingestion" },
+        action: "ingest.upsert",
+        entity: { type: "game", id: parsed.data.id },
+        changedPaths: changedKeys,
+      });
+    }
+  }
+
+  /**
+   * Find a game by external provider ID for deduplication during ingestion.
+   */
+  async findByExternalId(
+    provider: string,
+    externalId: string | number,
+  ): Promise<any | null> {
+    return this.gamesCol().findOne({
+      [`externalIds.${provider}`]: externalId,
     });
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Sort helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+function buildSort(sortBy?: SortBy): Record<string, 1 | -1> {
+  switch (sortBy) {
+    case "releaseDate":
+      return { "release.dateISO": 1, updatedAt: -1 };
+    case "releaseDateDesc":
+      return { "release.dateISO": -1, updatedAt: -1 };
+    case "name":
+      return { name: 1 };
+    case "updatedAt":
+    default:
+      return { updatedAt: -1 };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Composition helpers                                                */
+/* ------------------------------------------------------------------ */
 
 function deriveAvailability(
   g: any,

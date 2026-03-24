@@ -21,4 +21,13 @@ export type ProviderResult = {
 
   platforms?: string[]; // e.g. ["pc","ps5"]
   coverUrl?: string | null;
+
+  // ---- Enhanced fields (v2) ----
+
+  /** Short description scraped from the page / API */
+  description?: string | null;
+  /** Raw price string e.g. "59.99 USD" */
+  price?: string | null;
+  /** Genre / tag strings */
+  genres?: string[];
 };
