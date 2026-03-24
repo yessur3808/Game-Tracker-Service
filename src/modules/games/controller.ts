@@ -7,8 +7,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { GamesService } from "./service";
-
-const GAMES_API_SCHEMA_VERSION = "1";
+import { SCHEMA_VERSION } from "../../shared/version";
 
 function parseQueryLimit(raw: string | undefined): number | undefined {
   if (raw === undefined || raw === "") return undefined;
@@ -41,7 +40,7 @@ export class GamesController {
 
     return {
       generatedAt: new Date().toISOString(),
-      schemaVersion: GAMES_API_SCHEMA_VERSION,
+      schemaVersion: SCHEMA_VERSION,
       games,
       pagination: {
         skip: parsedSkip ?? 0,
