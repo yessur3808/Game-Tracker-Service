@@ -1,5 +1,14 @@
-import { Controller, Get, NotFoundException, Param, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Header,
+  NotFoundException,
+  Param,
+  Query,
+} from "@nestjs/common";
 import { GamesService } from "./service";
+
+const GAMES_API_SCHEMA_VERSION = "1";
 
 function parseQueryLimit(raw: string | undefined): number | undefined {
   if (raw === undefined || raw === "") return undefined;
@@ -12,18 +21,34 @@ export class GamesController {
   constructor(private readonly games: GamesService) {}
 
   @Get()
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=30")
   async list(
     @Query("platform") platform?: string,
     @Query("categoryType") categoryType?: string,
     @Query("availability") availability?: string,
     @Query("limit") limit?: string,
+    @Query("skip") skip?: string,
   ) {
-    return this.games.listComposed({
+    const parsedLimit = parseQueryLimit(limit);
+    const parsedSkip = parseQueryLimit(skip);
+    const games = await this.games.listComposed({
       platform,
       categoryType,
       availability,
-      limit: parseQueryLimit(limit),
+      limit: parsedLimit,
+      skip: parsedSkip,
     });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      schemaVersion: GAMES_API_SCHEMA_VERSION,
+      games,
+      pagination: {
+        skip: parsedSkip ?? 0,
+        limit: parsedLimit ?? 50,
+        count: games.length,
+      },
+    };
   }
 
   @Get("/search")

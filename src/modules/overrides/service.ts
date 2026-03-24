@@ -41,11 +41,16 @@ export class OverridesService {
   private validatePatch(patch: Partial<Game>) {
     const allowedTop = new Set([
       "name",
+      "title",
       "category",
       "platforms",
       "availability",
       "release",
       "seasonWindow",
+      "studio",
+      "media",
+      "coverUrl",
+      "popularityTier",
       "popularityRank",
       "tags",
       "sources",
