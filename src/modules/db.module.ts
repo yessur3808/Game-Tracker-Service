@@ -30,7 +30,7 @@ export const DB = Symbol("DB");
 export class DbModule {}
 
 async function ensureIndexes(db: Db) {
-  // games
+  // ── games ──────────────────────────────────────────────────────────
   await db.collection("games").createIndex({ id: 1 }, { unique: true });
   await db.collection("games").createIndex({ availability: 1 });
   await db.collection("games").createIndex({ "release.status": 1 });
@@ -45,7 +45,46 @@ async function ensureIndexes(db: Db) {
     .collection("games")
     .createIndex({ name: "text" }, { name: "games_name_text" });
 
-  // manual_sources
+  // Compound indexes for common filtered-and-sorted queries
+  await db
+    .collection("games")
+    .createIndex(
+      { availability: 1, "release.dateISO": 1 },
+      { name: "avail_releaseDate", sparse: true },
+    );
+  await db
+    .collection("games")
+    .createIndex(
+      { "category.type": 1, updatedAt: -1 },
+      { name: "catType_updatedAt" },
+    );
+  await db
+    .collection("games")
+    .createIndex(
+      { platforms: 1, updatedAt: -1 },
+      { name: "platform_updatedAt" },
+    );
+
+  // External IDs for cross-provider deduplication
+  await db
+    .collection("games")
+    .createIndex(
+      { "externalIds.steam": 1 },
+      { sparse: true, name: "extId_steam" },
+    );
+  await db
+    .collection("games")
+    .createIndex(
+      { "externalIds.igdb": 1 },
+      { sparse: true, name: "extId_igdb" },
+    );
+
+  // Ingestion tracking
+  await db
+    .collection("games")
+    .createIndex({ lastIngestedAt: -1 }, { sparse: true });
+
+  // ── manual_sources ─────────────────────────────────────────────────
   await db
     .collection("manual_sources")
     .createIndex({ gameId: 1, createdAt: -1 });
@@ -53,11 +92,11 @@ async function ensureIndexes(db: Db) {
     .collection("manual_sources")
     .createIndex({ gameId: 1, "source.url": 1 }, { unique: true });
 
-  // manual_overrides
+  // ── manual_overrides ───────────────────────────────────────────────
   await db
     .collection("manual_overrides")
     .createIndex({ gameId: 1, enabled: 1, updatedAt: -1 });
-  // recommended “only one enabled override per game”
+  // recommended "only one enabled override per game"
   await db.collection("manual_overrides").createIndex(
     { gameId: 1 },
     {
@@ -67,9 +106,24 @@ async function ensureIndexes(db: Db) {
     },
   );
 
-  // audit_log
+  // ── audit_log ──────────────────────────────────────────────────────
   await db
     .collection("audit_log")
     .createIndex({ "entity.type": 1, "entity.id": 1, at: -1 });
   await db.collection("audit_log").createIndex({ at: -1 });
+  // TTL: automatically purge audit entries older than 180 days
+  await db
+    .collection("audit_log")
+    .createIndex(
+      { at: 1 },
+      { expireAfterSeconds: 180 * 24 * 3600, name: "audit_ttl" },
+    );
+
+  // ── ingestion_runs (new collection for tracking crawl runs) ────────
+  await db
+    .collection("ingestion_runs")
+    .createIndex({ startedAt: -1 });
+  await db
+    .collection("ingestion_runs")
+    .createIndex({ status: 1, startedAt: -1 });
 }

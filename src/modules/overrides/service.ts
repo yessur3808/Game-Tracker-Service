@@ -42,6 +42,7 @@ export class OverridesService {
     const allowedTop = new Set([
       "name",
       "title",
+      "description",
       "category",
       "platforms",
       "availability",
@@ -53,7 +54,9 @@ export class OverridesService {
       "popularityTier",
       "popularityRank",
       "tags",
+      "genres",
       "sources",
+      "externalIds",
     ]);
 
     for (const key of Object.keys(patch)) {

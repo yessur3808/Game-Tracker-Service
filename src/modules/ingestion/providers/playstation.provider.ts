@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { fetchTextWithRetry } from "./http.util";
 import { ProviderResult } from "./types";
 import { validateProviderUrl } from "./url.util";
+import { extractAllFromHtml } from "./html.util";
 
 const PLAYSTATION_ALLOWED_HOSTS = [
   "playstation.com",
@@ -37,54 +38,25 @@ export class PlayStationProvider {
       this.logger,
     );
 
-    // Heuristic extraction (keep conservative)
-    const name =
-      extractMetaContent(html, "og:title") ?? extractTitleTag(html) ?? null;
-
-    const releaseText = extractReleaseLikeText(html) ?? null;
+    const extracted = extractAllFromHtml(html);
 
     return {
       provider: "playstation",
       fetchedAt: new Date().toISOString(),
       url,
-      name: cleanName(name),
-      releaseText,
-      releaseDateISO: null,
-      platforms: [], // optional: you can infer "ps5/ps4" later if you extract it
-      coverUrl: extractMetaContent(html, "og:image") ?? null,
+      name: cleanName(extracted.name),
+      releaseText: extracted.releaseText ?? null,
+      releaseDateISO: extracted.releaseDateISO ?? null,
+      platforms: extracted.platforms.length > 0 ? extracted.platforms : [],
+      coverUrl: extracted.coverUrl ?? null,
+      description: extracted.description ?? null,
+      price: extracted.price ?? null,
+      genres: extracted.genres,
     };
   }
-}
-
-function extractMetaContent(html: string, propertyOrName: string) {
-  // matches: <meta property="og:title" content="...">
-  const re1 = new RegExp(
-    `<meta\\s+[^>]*(?:property|name)=["']${escapeRegExp(
-      propertyOrName,
-    )}["'][^>]*content=["']([^"']+)["'][^>]*>`,
-    "i",
-  );
-  const m1 = html.match(re1);
-  return m1?.[1]?.trim() ?? null;
-}
-
-function extractTitleTag(html: string) {
-  const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  return m?.[1]?.trim() ?? null;
-}
-
-function extractReleaseLikeText(html: string) {
-  // Very rough: look for “Release date” nearby.
-  // This will not be perfect; we treat it as text only.
-  const m = html.match(/release\s*date[^<]{0,80}([A-Za-z0-9,\s]{3,40})/i);
-  return m?.[1]?.trim() ?? null;
 }
 
 function cleanName(name: string | null) {
   if (!name) return null;
   return name.replace(/\s+\|\s+PlayStation.*/i, "").trim();
-}
-
-function escapeRegExp(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

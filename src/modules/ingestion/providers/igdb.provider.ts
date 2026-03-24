@@ -33,9 +33,10 @@ export class IgdbProvider {
 
   async fetchGameById(igdbId: number): Promise<any | null> {
     const q = `
-      fields id,name,first_release_date,release_dates.date,release_dates.platform,release_dates.region,release_dates.status,
+      fields id,name,summary,first_release_date,release_dates.date,release_dates.platform,release_dates.region,release_dates.status,
              platforms.abbreviation,platforms.name,
-             cover.url, websites.url, websites.category;
+             cover.url, websites.url, websites.category,
+             genres.name, themes.name;
       where id = ${igdbId};
       limit 1;
     `;
@@ -60,6 +61,15 @@ export class IgdbProvider {
             .filter(Boolean)
         : [],
       coverUrl: normalizeIgdbImageUrl(g?.cover?.url ?? null),
+      description: g?.summary ?? null,
+      genres: [
+        ...(Array.isArray(g?.genres)
+          ? g.genres.map((x: any) => x?.name).filter(Boolean)
+          : []),
+        ...(Array.isArray(g?.themes)
+          ? g.themes.map((x: any) => x?.name).filter(Boolean)
+          : []),
+      ],
     };
   }
 
