@@ -25,7 +25,8 @@ describe("scoreSource", () => {
     });
 
     it("assigns 50 for unknown providers", () => {
-      const r = scoreSource(makeResult({ provider: "unknown-provider", url: "https://unknown-site.com/", releaseDateISO: undefined, coverUrl: undefined }));
+      // Cast through unknown to simulate a provider not in PROVIDER_BASE_SCORES
+      const r = scoreSource(makeResult({ provider: "unknown-provider" as unknown as import("../modules/ingestion/providers/types").ProviderKey, url: "https://unknown-site.com/", releaseDateISO: undefined, coverUrl: undefined }));
       // unknown provider — should use the default base score of 50
       // with only a name present, we expect it to be at least 50 and below IGDB's base (~80)
       expect(r.numericScore).toBeGreaterThanOrEqual(50);
