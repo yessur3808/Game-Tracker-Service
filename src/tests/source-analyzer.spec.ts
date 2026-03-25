@@ -25,10 +25,11 @@ describe("scoreSource", () => {
     });
 
     it("assigns 50 for unknown providers", () => {
-      const r = scoreSource(makeResult({ provider: "steam", url: "https://unknown-site.com/", releaseDateISO: undefined, coverUrl: undefined, name: undefined }));
-      // unknown domain — uses steam base 90 minus missing-name penalty 25 = 65
-      // but without name there's a penalty; let's just check it's > 0
-      expect(r.numericScore).toBeGreaterThan(0);
+      const r = scoreSource(makeResult({ provider: "unknown-provider", url: "https://unknown-site.com/", releaseDateISO: undefined, coverUrl: undefined }));
+      // unknown provider — should use the default base score of 50
+      // with only a name present, we expect it to be at least 50 and below IGDB's base (~80)
+      expect(r.numericScore).toBeGreaterThanOrEqual(50);
+      expect(r.numericScore).toBeLessThan(80);
     });
   });
 
