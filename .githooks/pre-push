@@ -1,0 +1,11 @@
+#!/bin/sh
+# Run the full test suite before every push.
+# Use `git push --no-verify` to skip if absolutely necessary.
+echo "Running tests before push..."
+npm test
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Tests failed. Push aborted."
+  echo "Fix the failing tests or use 'git push --no-verify' to bypass."
+  exit 1
+fi
