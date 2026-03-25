@@ -7,7 +7,7 @@
     "start": "node dist/main.js",
     "start:dev": "ts-node -r tsconfig-paths/register src/main.ts",
     "build": "tsc -p tsconfig.json",
-    "prepare": "[ -n \"$CI\" ] || git config core.hooksPath .githooks",
+    "prepare": "node -e \"if (!process.env.CI) { const { execSync } = require('child_process'); execSync('git config core.hooksPath .githooks', { stdio: 'inherit' }); }\"",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
