@@ -107,7 +107,7 @@ src/
 
 ### Requirements
 
-- Node.js 20+
+- Node.js 24.13.0 (per `.nvmrc`)
 - MongoDB 6+ (local or remote)
 
 ### Install
