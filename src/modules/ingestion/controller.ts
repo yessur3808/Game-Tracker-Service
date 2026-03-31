@@ -1,7 +1,9 @@
-import { Controller, HttpCode, Post } from "@nestjs/common";
+import { Controller, HttpCode, Post, UseGuards } from "@nestjs/common";
+import { AdminGuard } from "../admin/guard";
 import { IngestionService } from "./service";
 
 @Controller("/ingest")
+@UseGuards(AdminGuard)
 export class IngestionController {
   constructor(private readonly ingestion: IngestionService) {}
 
