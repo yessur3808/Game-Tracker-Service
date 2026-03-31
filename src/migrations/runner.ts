@@ -62,6 +62,8 @@ async function main() {
     const db = client.db(dbName);
     const col: Collection<Document> = db.collection(MIGRATIONS_COLLECTION);
 
+    // Ensure we never store duplicate migration names.
+    await col.createIndex({ name: 1 }, { unique: true });
     // Discover migration files in the same directory as this runner.
     // Works under ts-node (.ts) and compiled node (.js).
     const dir = __dirname;
