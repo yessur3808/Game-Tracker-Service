@@ -1,0 +1,1135 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Game Tracker Service",
+    "description": "Complete API collection for the Game Tracker Service.\n\n## Setup\n1. Import this collection into Postman.\n2. Set the `baseUrl` variable to your running instance (default: `http://localhost:3000`).\n3. Set the `adminApiKey` variable to the value of `ADMIN_API_KEY` in your `.env` file.\n\n## Workflow\nA typical testing flow:\n1. **Health** — verify the service is up and the DB is reachable.\n2. **Create a game** — use the *Admin > Create Game* request; the response `id` is automatically saved to the `gameId` variable.\n3. **Read the game** — use *Public > Get Game by ID* to see the composed view.\n4. **Add a manual source** — the returned `_id` is saved to `sourceId`.\n5. **Create an override** — the returned `_id` is saved to `overrideId`.\n6. **List, patch, delete** — explore the rest of the admin endpoints.\n7. **Trigger ingestion** — fire *Admin > Trigger Ingestion Run* to run the pipeline on demand.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Base URL of the running Game Tracker Service instance."
+    },
+    {
+      "key": "adminApiKey",
+      "value": "change-me",
+      "type": "string",
+      "description": "Value of ADMIN_API_KEY from your .env file."
+    },
+    {
+      "key": "gameId",
+      "value": "fortnite-ch6-s3",
+      "type": "string",
+      "description": "ID of the game to use in parameterised requests. Automatically updated when you create a game."
+    },
+    {
+      "key": "sourceId",
+      "value": "",
+      "type": "string",
+      "description": "MongoDB ObjectId of a manual source. Automatically updated when you create a manual source."
+    },
+    {
+      "key": "overrideId",
+      "value": "",
+      "type": "string",
+      "description": "MongoDB ObjectId of an override. Automatically updated when you create an override."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Liveness and readiness probes. No authentication required.",
+      "item": [
+        {
+          "name": "Liveness check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Returns `{ status: \"ok\" }` immediately without touching the database. Use this as a liveness probe."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2024-01-15T03:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Body has status ok', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.status).to.eql('ok');",
+                  "  pm.expect(json.timestamp).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "ready"]
+            },
+            "description": "Pings MongoDB. Returns `{ status: \"ready\" }` on success or `503` if the database is unreachable."
+          },
+          "response": [
+            {
+              "name": "200 Ready",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"ready\",\n  \"timestamp\": \"2024-01-15T03:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "503 Unavailable",
+              "status": "Service Unavailable",
+              "code": 503,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"unavailable\",\n  \"reason\": \"MongoDB ping failed\",\n  \"timestamp\": \"2024-01-15T03:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Body has status ready', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.status).to.eql('ready');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Public — Games",
+      "description": "Public read-only endpoints. No authentication required.",
+      "item": [
+        {
+          "name": "List games",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/games?limit=25&skip=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["games"],
+              "query": [
+                {
+                  "key": "platform",
+                  "value": "",
+                  "description": "Filter by platform (e.g. PC, PS5, Xbox, Switch). Leave blank for all.",
+                  "disabled": true
+                },
+                {
+                  "key": "categoryType",
+                  "value": "",
+                  "description": "Filter by category: full_game | dlc | season | event | update | store_reset",
+                  "disabled": true
+                },
+                {
+                  "key": "availability",
+                  "value": "",
+                  "description": "Filter by availability: upcoming | released | unknown",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "",
+                  "description": "Sort order: updatedAt (default) | releaseDate | releaseDateDesc | name",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "25",
+                  "description": "Results per page (1–200, default 50)"
+                },
+                {
+                  "key": "skip",
+                  "value": "0",
+                  "description": "Pagination offset"
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "description": "Comma-separated field projection, e.g. id,name,availability,release",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List games with optional filtering, sorting, and field projection.\n\nResponse includes `pagination` metadata and an `ETag` header for conditional requests."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Cache-Control", "value": "public, max-age=60, stale-while-revalidate=30" },
+                { "key": "ETag", "value": "W/\"abc123def456\"" }
+              ],
+              "body": "{\n  \"generatedAt\": \"2024-01-15T03:00:00.000Z\",\n  \"schemaVersion\": 1,\n  \"games\": [\n    {\n      \"id\": \"fortnite-ch6-s3\",\n      \"name\": \"Fortnite Chapter 6 Season 3\",\n      \"category\": { \"type\": \"season\", \"franchise\": \"Fortnite\", \"seasonNumber\": 3 },\n      \"platforms\": [\"PC\", \"PS5\", \"Xbox Series X\", \"Switch\"],\n      \"availability\": \"upcoming\",\n      \"release\": {\n        \"status\": \"upcoming\",\n        \"confidence\": \"likely\",\n        \"isOfficial\": false,\n        \"dateISO\": \"2024-03-01\",\n        \"datePrecision\": \"month\",\n        \"sources\": []\n      },\n      \"updatedAt\": \"2024-01-10T12:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"skip\": 0,\n    \"limit\": 25,\n    \"count\": 1,\n    \"totalCount\": 1\n  }\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has games array', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.games).to.be.an('array');",
+                  "  pm.expect(json.pagination).to.be.an('object');",
+                  "  pm.expect(json.schemaVersion).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List games — filter by platform + availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/games?platform=PC&availability=upcoming&sortBy=releaseDate&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["games"],
+              "query": [
+                { "key": "platform", "value": "PC" },
+                { "key": "availability", "value": "upcoming" },
+                { "key": "sortBy", "value": "releaseDate" },
+                { "key": "limit", "value": "50" }
+              ]
+            },
+            "description": "Example: fetch upcoming PC games sorted by release date."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All returned games are upcoming', () => {",
+                  "  const json = pm.response.json();",
+                  "  json.games.forEach(g => pm.expect(g.availability).to.eql('upcoming'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search games by name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/games/search?q=fortnite&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["games", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "fortnite",
+                  "description": "Search term (required)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Max results to return"
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "description": "Comma-separated field projection",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Full-text search across game names. Returns an empty array if `q` is blank."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"games\": [\n    {\n      \"id\": \"fortnite-ch6-s3\",\n      \"name\": \"Fortnite Chapter 6 Season 3\"\n    }\n  ],\n  \"totalCount\": 1\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has games array and totalCount', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.games).to.be.an('array');",
+                  "  pm.expect(json.totalCount).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upcoming games",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/games/upcoming?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["games", "upcoming"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "skip", "value": "", "disabled": true },
+                { "key": "fields", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Convenience endpoint: games with `availability: upcoming` sorted by release date ascending."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has expected shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.games).to.be.an('array');",
+                  "  pm.expect(json.generatedAt).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recently released games",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/games/recently-released?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["games", "recently-released"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "skip", "value": "", "disabled": true },
+                { "key": "fields", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Convenience endpoint: games with `availability: released` sorted by release date descending."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has games array', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.games).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get game by ID (composed)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/games/{{gameId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["games", "{{gameId}}"],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "",
+                  "description": "Comma-separated field projection, e.g. id,name,availability,release,sources",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Fetch a single game by its `id` field. Returns the fully composed view:\n1. Canonical game data\n2. + Manual sources (deduplicated by URL)\n3. + Enabled manual override patch (deep merge)\n4. + Recomputed `availability`\n\nReturns `404` if the game does not exist."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"fortnite-ch6-s3\",\n  \"name\": \"Fortnite Chapter 6 Season 3\",\n  \"title\": \"Fortnite Chapter 6: Season 3\",\n  \"description\": \"The third season of Fortnite Chapter 6.\",\n  \"category\": {\n    \"type\": \"season\",\n    \"franchise\": \"Fortnite\",\n    \"gameId\": \"fortnite\",\n    \"seasonNumber\": 3\n  },\n  \"platforms\": [\"PC\", \"PS5\", \"Xbox Series X\", \"Switch\"],\n  \"availability\": \"upcoming\",\n  \"release\": {\n    \"status\": \"upcoming\",\n    \"confidence\": \"likely\",\n    \"isOfficial\": false,\n    \"dateISO\": \"2024-03-01\",\n    \"datePrecision\": \"month\",\n    \"sources\": []\n  },\n  \"sources\": [],\n  \"updatedAt\": \"2024-01-10T12:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Game not found\",\n  \"path\": \"/games/unknown-id\",\n  \"timestamp\": \"2024-01-15T03:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Game has required fields', () => {",
+                  "  const g = pm.response.json();",
+                  "  pm.expect(g.id).to.be.a('string');",
+                  "  pm.expect(g.name).to.be.a('string');",
+                  "  pm.expect(g.availability).to.be.oneOf(['upcoming', 'released', 'cancelled', 'unknown']);",
+                  "  pm.expect(g.release).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get game by ID — field projection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/games/{{gameId}}?fields=id,name,availability,release",
+              "host": ["{{baseUrl}}"],
+              "path": ["games", "{{gameId}}"],
+              "query": [
+                { "key": "fields", "value": "id,name,availability,release" }
+              ]
+            },
+            "description": "Example: fetch only specific fields from a game to reduce payload size."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Games",
+      "description": "Admin endpoints for managing canonical game records. All requests require the `X-Admin-Key` header.",
+      "item": [
+        {
+          "name": "Create game",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"game\": {\n    \"id\": \"fortnite-ch6-s3\",\n    \"name\": \"Fortnite Chapter 6 Season 3\",\n    \"title\": \"Fortnite Chapter 6: Season 3\",\n    \"description\": \"The third season of Fortnite Chapter 6.\",\n    \"category\": {\n      \"type\": \"season\",\n      \"franchise\": \"Fortnite\",\n      \"gameId\": \"fortnite\",\n      \"seasonNumber\": 3,\n      \"seasonName\": \"Season 3\"\n    },\n    \"platforms\": [\"PC\", \"PS5\", \"Xbox Series X\", \"Switch\"],\n    \"availability\": \"upcoming\",\n    \"release\": {\n      \"status\": \"upcoming\",\n      \"confidence\": \"likely\",\n      \"isOfficial\": false,\n      \"dateISO\": \"2024-03-01\",\n      \"datePrecision\": \"month\",\n      \"sources\": []\n    },\n    \"studio\": {\n      \"name\": \"Epic Games\",\n      \"type\": \"developer_publisher\",\n      \"website\": \"https://www.epicgames.com\"\n    },\n    \"genres\": [\"Battle Royale\", \"Shooter\"],\n    \"tags\": [\"free-to-play\", \"live-service\"],\n    \"popularityTier\": \"blockbuster\",\n    \"sources\": [],\n    \"externalIds\": {\n      \"epic\": \"fortnite\"\n    }\n  },\n  \"reason\": \"Initial entry for Fortnite Chapter 6 Season 3\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games"]
+            },
+            "description": "Create a new canonical game record. The `game.id` must be unique (acts as a slug).\n\nThe response `id` is automatically saved to the `gameId` collection variable."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"fortnite-ch6-s3\",\n  \"name\": \"Fortnite Chapter 6 Season 3\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Invalid admin key\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Save gameId variable', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.id).to.be.a('string');",
+                  "  pm.collectionVariables.set('gameId', json.id);",
+                  "  console.log('Saved gameId:', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create game — minimal",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"game\": {\n    \"id\": \"my-new-game\",\n    \"name\": \"My New Game\",\n    \"category\": { \"type\": \"full_game\" },\n    \"platforms\": [\"PC\"],\n    \"availability\": \"upcoming\",\n    \"release\": {\n      \"status\": \"announced\",\n      \"confidence\": \"official\",\n      \"isOfficial\": true,\n      \"sources\": []\n    },\n    \"sources\": []\n  },\n  \"reason\": \"Minimal example\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games"]
+            },
+            "description": "Example with only required fields."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Patch game (canonical)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patch\": {\n    \"availability\": \"released\",\n    \"release\": {\n      \"status\": \"released\",\n      \"confidence\": \"official\",\n      \"isOfficial\": true,\n      \"dateISO\": \"2024-03-15\",\n      \"datePrecision\": \"day\",\n      \"sources\": []\n    }\n  },\n  \"reason\": \"Game has launched — updating release status\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}"]
+            },
+            "description": "Directly patch the canonical game record. This is a permanent, destructive edit.\n\n> **Tip:** Prefer creating an **override** instead when you want a reversible, auditable correction to ingested data."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete game",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Duplicate entry — merged into main game record\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}"]
+            },
+            "description": "Delete a canonical game record. The reason is recorded in the audit log."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List overrides for game",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}/overrides",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}", "overrides"]
+            },
+            "description": "List all overrides (enabled and disabled) attached to a game."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => {",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List manual sources for game",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}/manual-sources",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}", "manual-sources"]
+            },
+            "description": "List all manual sources attached to a game."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => {",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin — Manual Sources",
+      "description": "Admin endpoints for managing manual sources attached to games. All requests require the `X-Admin-Key` header.\n\nManual sources are additional URLs or claims you attach to a game record. They are scoped to different parts of the composed view:\n- `general` — attached to the top-level sources array\n- `release` — scoped to release date evidence\n- `seasonWindow` — scoped to season start/end window evidence\n- `media` — scoped to media content",
+      "item": [
+        {
+          "name": "Add manual source",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": {\n    \"type\": \"platform_store\",\n    \"name\": \"Epic Games Store\",\n    \"url\": \"https://store.epicgames.com/en-US/p/fortnite\",\n    \"isOfficial\": true,\n    \"reliability\": \"high\",\n    \"claim\": \"Official Epic Games Store listing for Fortnite\"\n  },\n  \"scope\": \"general\",\n  \"reason\": \"Adding official Epic Games Store link\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}/manual-sources",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}", "manual-sources"]
+            },
+            "description": "Attach a manual source to a game. The `scope` controls where it appears in the composed view.\n\nThe response `_id` is automatically saved to the `sourceId` collection variable."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"_id\": \"65a1b2c3d4e5f6a7b8c9d0e1\",\n  \"gameId\": \"fortnite-ch6-s3\",\n  \"scope\": \"general\",\n  \"source\": {\n    \"type\": \"platform_store\",\n    \"name\": \"Epic Games Store\",\n    \"url\": \"https://store.epicgames.com/en-US/p/fortnite\",\n    \"isOfficial\": true,\n    \"reliability\": \"high\",\n    \"claim\": \"Official Epic Games Store listing for Fortnite\"\n  },\n  \"createdAt\": \"2024-01-15T03:00:00.000Z\",\n  \"updatedAt\": \"2024-01-15T03:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Save sourceId variable', () => {",
+                  "  const json = pm.response.json();",
+                  "  const id = json._id || (json.insertedId);",
+                  "  if (id) {",
+                  "    pm.collectionVariables.set('sourceId', id);",
+                  "    console.log('Saved sourceId:', id);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add manual source — release evidence",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": {\n    \"type\": \"gaming_news\",\n    \"name\": \"IGN Article\",\n    \"url\": \"https://ign.com/articles/fortnite-ch6-season3-release-date\",\n    \"isOfficial\": false,\n    \"reliability\": \"medium\",\n    \"claim\": \"Reports Fortnite Chapter 6 Season 3 launches in early March 2024\",\n    \"credibilityScore\": 75\n  },\n  \"scope\": \"release\",\n  \"reason\": \"Third-party news source for release date evidence\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}/manual-sources",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}", "manual-sources"]
+            },
+            "description": "Example: add a news article as evidence for the release date, scoped to `release`."
+          },
+          "response": []
+        },
+        {
+          "name": "Patch manual source",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": {\n    \"type\": \"platform_store\",\n    \"name\": \"Epic Games Store\",\n    \"url\": \"https://store.epicgames.com/en-US/p/fortnite\",\n    \"isOfficial\": true,\n    \"reliability\": \"high\",\n    \"claim\": \"Updated: official Epic Games Store listing\",\n    \"lastCheckedAt\": \"2024-01-15T03:00:00.000Z\",\n    \"checkCount\": 2\n  },\n  \"reason\": \"Updated claim text and check metadata\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/manual-sources/{{sourceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "manual-sources", "{{sourceId}}"]
+            },
+            "description": "Update an existing manual source by its MongoDB `_id`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete manual source",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Source is no longer valid\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/manual-sources/{{sourceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "manual-sources", "{{sourceId}}"]
+            },
+            "description": "Remove a manual source by its MongoDB `_id`. The deletion is recorded in the audit log."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin — Overrides",
+      "description": "Admin endpoints for managing field-level overrides. All requests require the `X-Admin-Key` header.\n\nAn override is a `Partial<Game>` patch applied at read time via a deep merge (arrays are replaced, not merged). Only **one** override can be `enabled: true` per game — enabling a new one automatically disables the previous one.\n\nThis is the preferred way to make reversible corrections to ingested data.",
+      "item": [
+        {
+          "name": "Create override (enabled)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patch\": {\n    \"availability\": \"upcoming\",\n    \"release\": {\n      \"status\": \"delayed\",\n      \"confidence\": \"official\",\n      \"isOfficial\": true,\n      \"dateISO\": \"2024-04-01\",\n      \"datePrecision\": \"month\",\n      \"sources\": []\n    }\n  },\n  \"enabled\": true,\n  \"reason\": \"Season 3 delayed — overriding ingested release date with confirmed new date\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}/overrides",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}", "overrides"]
+            },
+            "description": "Create an override and enable it immediately. Any previously enabled override for this game is automatically disabled.\n\nThe response `_id` is automatically saved to the `overrideId` collection variable."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"_id\": \"65b2c3d4e5f6a7b8c9d0e1f2\",\n  \"gameId\": \"fortnite-ch6-s3\",\n  \"enabled\": true,\n  \"patch\": {\n    \"availability\": \"upcoming\",\n    \"release\": {\n      \"status\": \"delayed\",\n      \"confidence\": \"official\",\n      \"isOfficial\": true,\n      \"dateISO\": \"2024-04-01\",\n      \"datePrecision\": \"month\",\n      \"sources\": []\n    }\n  },\n  \"reason\": \"Season 3 delayed — overriding ingested release date with confirmed new date\",\n  \"createdAt\": \"2024-01-15T03:00:00.000Z\",\n  \"updatedAt\": \"2024-01-15T03:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Save overrideId variable', () => {",
+                  "  const json = pm.response.json();",
+                  "  const id = json._id;",
+                  "  if (id) {",
+                  "    pm.collectionVariables.set('overrideId', id);",
+                  "    console.log('Saved overrideId:', id);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create override (disabled / draft)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patch\": {\n    \"genres\": [\"Battle Royale\", \"Shooter\", \"Survival\"]\n  },\n  \"enabled\": false,\n  \"reason\": \"Draft override — not applied yet\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/games/{{gameId}}/overrides",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "games", "{{gameId}}", "overrides"]
+            },
+            "description": "Create an override as a draft (disabled). Enable it later with the PATCH endpoint."
+          },
+          "response": []
+        },
+        {
+          "name": "Patch override — enable",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"reason\": \"Delay confirmed — activating override\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/overrides/{{overrideId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "overrides", "{{overrideId}}"]
+            },
+            "description": "Enable a previously disabled override. Any previously enabled override for the same game is automatically disabled."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Patch override — disable",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": false,\n  \"reason\": \"Delay resolved — reverting to ingested data\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/overrides/{{overrideId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "overrides", "{{overrideId}}"]
+            },
+            "description": "Disable an active override. The game will revert to its canonical ingested data."
+          },
+          "response": []
+        },
+        {
+          "name": "Patch override — update patch content",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patch\": {\n    \"availability\": \"upcoming\",\n    \"release\": {\n      \"status\": \"delayed\",\n      \"confidence\": \"official\",\n      \"isOfficial\": true,\n      \"dateISO\": \"2024-05-01\",\n      \"datePrecision\": \"month\",\n      \"sources\": []\n    }\n  },\n  \"reason\": \"Further delay — updating the new estimated release month\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/overrides/{{overrideId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "overrides", "{{overrideId}}"]
+            },
+            "description": "Update the patch content of an existing override without changing its enabled state."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Audit Log",
+      "description": "Query the audit log for a history of all admin and ingestion actions. Entries expire after 180 days (TTL index). Requires the `X-Admin-Key` header.",
+      "item": [
+        {
+          "name": "Get audit log (all)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit?limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "audit"],
+              "query": [
+                { "key": "limit", "value": "50", "description": "1–200, default 50" },
+                { "key": "entityType", "value": "", "disabled": true, "description": "e.g. game, manual_source, override" },
+                { "key": "entityId", "value": "", "disabled": true, "description": "Specific entity ID to filter by" }
+              ]
+            },
+            "description": "Fetch the most recent audit log entries across all entity types."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"_id\": \"65c3d4e5f6a7b8c9d0e1f2a3\",\n    \"at\": \"2024-01-15T03:00:00.000Z\",\n    \"action\": \"game.create\",\n    \"actor\": { \"type\": \"admin\" },\n    \"entity\": { \"type\": \"game\", \"id\": \"fortnite-ch6-s3\" },\n    \"after\": { \"id\": \"fortnite-ch6-s3\", \"name\": \"Fortnite Chapter 6 Season 3\" }\n  }\n]",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => {",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get audit log — filter by game",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit?entityType=game&entityId={{gameId}}&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "audit"],
+              "query": [
+                { "key": "entityType", "value": "game" },
+                { "key": "entityId", "value": "{{gameId}}" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Fetch audit log entries for a specific game."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All entries are for the requested game', () => {",
+                  "  const entries = pm.response.json();",
+                  "  const gameId = pm.collectionVariables.get('gameId');",
+                  "  entries.forEach(e => {",
+                  "    if (e.entity) pm.expect(e.entity.id).to.eql(gameId);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get audit log — filter by entity type",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit?entityType=override&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "audit"],
+              "query": [
+                { "key": "entityType", "value": "override" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Example: filter audit log to show only override-related actions."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Ingestion",
+      "description": "Admin endpoints for the data ingestion pipeline. Requires the `X-Admin-Key` header.\n\nThe ingestion pipeline runs automatically at 03:00 UTC on the 1st and 15th of every month. Use these endpoints to trigger it on demand or check run history.",
+      "item": [
+        {
+          "name": "Trigger ingestion run",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminApiKey}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ingest/run",
+              "host": ["{{baseUrl}}"],
+              "path": ["ingest", "run"]
+            },
+            "description": "Trigger the full ingestion pipeline immediately. The run executes in the background; this endpoint returns `202 Accepted` as soon as the run starts.\n\nCheck the `ingestion_runs` collection in MongoDB for run status and per-game results.\n\n**What the pipeline does:**\n1. Loads all games from the database\n2. Calls each applicable provider (Steam, IGDB, Epic, PlayStation, Xbox, Nintendo)\n3. Discovers new source URLs via the crawler\n4. Merges and upserts results back into the `games` collection\n5. Records run metadata in `ingestion_runs`"
+          },
+          "response": [
+            {
+              "name": "202 Accepted",
+              "status": "Accepted",
+              "code": 202,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Ingestion run started\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.test('Response confirms start', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('started');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

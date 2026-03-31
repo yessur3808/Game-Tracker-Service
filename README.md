@@ -30,6 +30,7 @@ A NestJS + MongoDB service for tracking video game releases across multiple plat
 - [Ingestion & Providers](#ingestion--providers)
 - [Security](#security)
 - [Testing](#testing)
+- [Postman Collection](#postman-collection)
 - [Environment Variables](#environment-variables)
 
 ---
@@ -646,6 +647,41 @@ Test files live in `src/tests/` and cover:
 A pre-push git hook (`.githooks/pre-push`) automatically runs `npm test` before every `git push`.
 
 CI runs the full build and test suite on Node.js 20 for every push and pull request.
+
+---
+
+## Postman Collection
+
+A ready-to-use Postman collection is included at [`postman/Game-Tracker-Service.postman_collection.json`](postman/Game-Tracker-Service.postman_collection.json).
+
+### Import
+
+1. Open Postman and click **Import**.
+2. Select the file `postman/Game-Tracker-Service.postman_collection.json`.
+3. The collection will appear with all folders and requests pre-configured.
+
+### Collection variables
+
+After importing, set these variables in the collection's **Variables** tab (or in an environment):
+
+| Variable | Default | Description |
+|---|---|---|
+| `baseUrl` | `http://localhost:3000` | URL of your running instance |
+| `adminApiKey` | `change-me` | Value of `ADMIN_API_KEY` from your `.env` |
+| `gameId` | `fortnite-ch6-s3` | Game ID used in parameterised requests (auto-updated on create) |
+| `sourceId` | *(empty)* | Manual source `_id` (auto-updated on create) |
+| `overrideId` | *(empty)* | Override `_id` (auto-updated on create) |
+
+### Recommended workflow
+
+1. **Health** — confirm the service is up and MongoDB is reachable.
+2. **Admin > Create Game** — creates a game and saves its `id` to `gameId`.
+3. **Public > Get Game by ID** — verify the composed view.
+4. **Admin > Add Manual Source** — attach a source; `sourceId` is saved automatically.
+5. **Admin > Create Override (enabled)** — apply a patch; `overrideId` is saved automatically.
+6. **Public > Get Game by ID** — observe the override applied to the response.
+7. **Admin > Patch Override — disable** — revert to canonical data.
+8. **Admin > Trigger Ingestion Run** — fire the pipeline on demand.
 
 ---
 
