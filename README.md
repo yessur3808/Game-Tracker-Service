@@ -39,7 +39,7 @@ A NestJS + MongoDB service for tracking video game releases across multiple plat
 
 ### Public API
 - List games with filtering by platform, category, availability, and sorting options
-- Full-text search by game name
+- Search games by name (case-insensitive, partial match)
 - Dedicated endpoints for upcoming and recently-released games
 - **Composed read** — every game response merges canonical data + active manual override + manual sources + recomputed `availability`
 
