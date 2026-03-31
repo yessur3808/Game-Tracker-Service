@@ -592,7 +592,7 @@ The `SourceFinderService` automatically discovers new game URLs by:
 - Searching IGDB by game name and extracting linked website URLs
 - Searching the Steam catalog by game name
 
-Discovered URLs are resolved by `LinkResolverService` (HEAD request, HTTPS-only validation) before being recorded.
+Discovered URLs are resolved by `LinkResolverService` (HEAD request with initial HTTPS scheme check) before being recorded.
 
 ### Pipeline Steps
 
