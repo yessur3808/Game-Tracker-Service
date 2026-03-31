@@ -483,12 +483,12 @@ Check the `ingestion_runs` collection in MongoDB for run status and results.
   popularityRank?: number
   sources: Source[]
   externalIds?: {
-    steam?: { appId: number }
-    igdb?: { gameId: number }
-    epic?: { slug: string }
-    playstation?: { cpsId: string }
-    xbox?: { id: string }
-    nintendo?: { nfsId: string }
+    steam?: number        // Steam app ID
+    igdb?: number         // IGDB game ID
+    epic?: string         // Epic Games slug
+    playstation?: string  // PlayStation CPSID
+    xbox?: string         // Xbox ID
+    nintendo?: string     // Nintendo ID
   }
   updatedAt?: string           // ISO 8601
   lastIngestedAt?: string      // ISO 8601
