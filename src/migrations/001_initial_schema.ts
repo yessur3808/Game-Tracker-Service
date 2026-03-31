@@ -85,3 +85,70 @@ export async function up(db: Db): Promise<void> {
     .collection("ingestion_runs")
     .createIndex({ status: 1, startedAt: -1 });
 }
+
+export async function down(db: Db): Promise<void> {
+  // ── games ────────────────────────────────────────────────────────────────
+  const gameIndexNames = [
+    "id_1",
+    "availability_1",
+    "release.status_1",
+    "release.dateISO_1",
+    "platforms_1",
+    "category.type_1",
+    "updatedAt_-1",
+    "lastIngestedAt_-1",
+    "games_name_text",
+    "avail_releaseDate",
+    "catType_updatedAt",
+    "platform_updatedAt",
+    "extId_steam",
+    "extId_igdb",
+  ];
+  for (const name of gameIndexNames) {
+    await db.collection("games").dropIndex(name).catch(() => null);
+  }
+
+  // ── manual_sources ───────────────────────────────────────────────────────
+  await db
+    .collection("manual_sources")
+    .dropIndex("gameId_1_createdAt_-1")
+    .catch(() => null);
+  await db
+    .collection("manual_sources")
+    .dropIndex("gameId_1_source.url_1")
+    .catch(() => null);
+
+  // ── manual_overrides ─────────────────────────────────────────────────────
+  await db
+    .collection("manual_overrides")
+    .dropIndex("gameId_1_enabled_1_updatedAt_-1")
+    .catch(() => null);
+  await db
+    .collection("manual_overrides")
+    .dropIndex("uniq_enabled_override_per_game")
+    .catch(() => null);
+
+  // ── audit_log ────────────────────────────────────────────────────────────
+  await db
+    .collection("audit_log")
+    .dropIndex("entity.type_1_entity.id_1_at_-1")
+    .catch(() => null);
+  await db
+    .collection("audit_log")
+    .dropIndex("at_-1")
+    .catch(() => null);
+  await db
+    .collection("audit_log")
+    .dropIndex("audit_ttl")
+    .catch(() => null);
+
+  // ── ingestion_runs ───────────────────────────────────────────────────────
+  await db
+    .collection("ingestion_runs")
+    .dropIndex("startedAt_-1")
+    .catch(() => null);
+  await db
+    .collection("ingestion_runs")
+    .dropIndex("status_1_startedAt_-1")
+    .catch(() => null);
+}
