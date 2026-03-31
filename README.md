@@ -472,11 +472,13 @@ Check the `ingestion_runs` collection in MongoDB for run status and results.
     description?: string
   }
   media?: {
-    cover?: { url: string, width?: number, height?: number }
-    screenshots?: { url: string }[]
-    trailerUrl?: string
+    // ImageAsset union; see src/shared/types.ts / src/shared/schemas.ts
+    cover?: { url: string, width?: number, height?: number, alt?: string }
+    coverUrl?: string          // optional normalized cover URL
+    screenshots?: { url: string, width?: number, height?: number, alt?: string }[]
+    trailers?: { url: string }[]
   }
-  coverUrl?: string            // legacy; prefer media.cover
+  coverUrl?: string            // legacy; prefer media.cover or media.coverUrl
   genres?: string[]            // e.g. ["Action", "RPG"]
   tags?: string[]
   popularityTier?: string
