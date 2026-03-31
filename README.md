@@ -574,12 +574,12 @@ The ingestion pipeline runs automatically at **03:00 UTC on the 1st and 15th** o
 
 | Provider | Data Source | External ID field |
 |---|---|---|
-| **Steam** | Steam API (`appdetails`) | `externalIds.steam.appId` |
-| **IGDB** | IGDB API *(Twitch credentials required)* | `externalIds.igdb.gameId` |
-| **Epic Games** | Epic Games Store (HTML scrape) | `externalIds.epic.slug` |
-| **PlayStation** | PlayStation Store (HTML scrape) | `externalIds.playstation.cpsId` |
-| **Xbox** | Microsoft Store (HTML scrape) | `externalIds.xbox.id` |
-| **Nintendo** | Nintendo eShop (HTML scrape) | `externalIds.nintendo.nfsId` |
+| **Steam** | Steam API (`appdetails`) | `externalIds.steam` |
+| **IGDB** | IGDB API *(Twitch credentials required)* | `externalIds.igdb` |
+| **Epic Games** | Epic Games Store (HTML scrape) | `externalIds.epic` |
+| **PlayStation** | PlayStation Store (HTML scrape) | `externalIds.playstation` |
+| **Xbox** | Microsoft Store (HTML scrape) | `externalIds.xbox` |
+| **Nintendo** | Nintendo eShop (HTML scrape) | `externalIds.nintendo` |
 
 Each provider returns a `ProviderResult` containing: name, release text/date, platforms, cover URL, description, price, and genres.
 
