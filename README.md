@@ -68,7 +68,7 @@ A NestJS + MongoDB service for tracking video game releases across multiple plat
 | Scheduling | `@nestjs/schedule` (cron) |
 | Language | TypeScript 5 |
 | Testing | Jest + ts-jest |
-| Runtime | Node.js 20 |
+| Runtime | Node.js 24 |
 
 ---
 
@@ -236,7 +236,7 @@ Response:
 
 #### `GET /games/search`
 
-Full-text search by game name.
+Case-insensitive, partial name search.
 
 | Query Param | Type | Description |
 |---|---|---|
