@@ -1,7 +1,7 @@
 import { Controller, HttpCode, Post } from "@nestjs/common";
 import { IngestionService } from "./service";
 
-@Controller("ingest")
+@Controller("/ingest")
 export class IngestionController {
   constructor(private readonly ingestion: IngestionService) {}
 
