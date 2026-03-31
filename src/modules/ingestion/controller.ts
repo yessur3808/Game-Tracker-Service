@@ -13,7 +13,9 @@ export class IngestionController {
   @Post("run")
   @HttpCode(202)
   triggerRun(): { message: string } {
-    void this.ingestion.runBiWeekly();
+    void this.ingestion.runBiWeekly().catch((err) => {
+      console.error("Ingestion run failed", err);
+    });
     return { message: "Ingestion run started" };
   }
 }
