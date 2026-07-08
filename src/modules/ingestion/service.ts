@@ -15,6 +15,7 @@ import {
   mergeProviderResults,
   normalizeProviderResult,
 } from "./analysis/normalizer";
+import { DiscoveryService } from "./discovery/discovery.service";
 
 type IngestionRunStatus = "running" | "completed" | "failed";
 
@@ -28,6 +29,7 @@ export class IngestionService {
     private readonly steam: SteamProvider,
     private readonly igdb: IgdbProvider,
     private readonly epic: EpicProvider,
+    private readonly discovery: DiscoveryService,
     private readonly playstation: PlayStationProvider,
     private readonly xbox: XboxProvider,
     private readonly nintendo: NintendoProvider,
@@ -48,9 +50,25 @@ export class IngestionService {
    * 4. Merges provider results and upserts
    * 5. Records the run in ingestion_runs collection
    */
+  /**
+   * Discovery cron: runs every 3 minutes.
+   * Finds new games from the Steam public catalog and seeds them into the DB.
+   * The refresh pipeline (runBiWeekly) then enriches whatever is already seeded.
+   */
+  @Cron("*/3 * * * *")
+  async runDiscoveryCron() {
+    this.logger.log("Discovery cron firing");
+    const stats = await this.discovery.runDiscovery(200);
+    this.logger.log(
+      `Discovery complete — ${stats.seeded} seeded, ${stats.skipped} skipped, ${stats.failed} failed, ${stats.total} total`,
+    );
+  }
+
   @Cron("0 3 1,15 * *")
   async runBiWeekly() {
+    this.logger.log("Ingestion run firing (scheduled: 03:00 UTC on 1st & 15th)");
     const runId = await this.startRun();
+    const startedAt = Date.now();
 
     try {
       const allGames = await this.db
@@ -58,6 +76,8 @@ export class IngestionService {
         .find({})
         .project({ id: 1, name: 1, externalIds: 1, sources: 1 })
         .toArray();
+
+      this.logger.log(`Run ${runId} started — ${allGames.length} game(s) queued`);
 
       let updated = 0;
       let failed = 0;
@@ -73,17 +93,22 @@ export class IngestionService {
           if (r.status === "fulfilled" && r.value) updated++;
           else if (r.status === "rejected") {
             failed++;
-            this.logger.warn(`Ingestion failed: ${r.reason}`);
+            this.logger.warn(`Run ${runId} — game ingestion failed: ${r.reason}`);
           }
         }
       }
 
+      const elapsedMs = Date.now() - startedAt;
       await this.completeRun(runId, "completed", { updated, failed, total: allGames.length });
       this.logger.log(
-        `Ingestion complete: ${updated} updated, ${failed} failed, ${allGames.length} total`,
+        `Run ${runId} complete — ${updated} updated, ${failed} failed, ${allGames.length} total (${elapsedMs}ms)`,
       );
     } catch (err: any) {
-      this.logger.error(`Ingestion run failed: ${err.message}`);
+      const elapsedMs = Date.now() - startedAt;
+      this.logger.error(
+        `Run ${runId} failed after ${elapsedMs}ms: ${err.message}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       await this.completeRun(runId, "failed", { error: err.message });
     }
   }

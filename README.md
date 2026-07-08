@@ -17,6 +17,7 @@ A NestJS + MongoDB service for tracking video game releases across multiple plat
   - [Configure Environment](#configure-environment)
   - [Database Migrations](#database-migrations)
   - [Run](#run)
+  - [PM2](#pm2)
   - [Docker](#docker)
 - [API Reference](#api-reference)
   - [Health](#health)
@@ -28,6 +29,7 @@ A NestJS + MongoDB service for tracking video game releases across multiple plat
   - [Admin — Ingestion](#admin--ingestion)
 - [Data Models](#data-models)
 - [Ingestion & Providers](#ingestion--providers)
+  - [Host Cron Trigger](#host-cron-trigger)
 - [Security](#security)
 - [Testing](#testing)
 - [Postman Collection](#postman-collection)
@@ -169,6 +171,44 @@ npm start
 ```
 
 The server starts on `http://localhost:3000` (or the `PORT` you configured).
+
+### PM2
+
+An ecosystem file is included at `ecosystem.config.cjs`.
+
+```bash
+# 1) build runtime files
+npm run build
+
+# 2) start with PM2
+pm2 start ecosystem.config.cjs
+
+# 3) verify
+pm2 status
+pm2 logs game-tracker-service --lines 100
+```
+
+Useful PM2 commands:
+
+```bash
+pm2 restart game-tracker-service
+pm2 stop game-tracker-service
+pm2 delete game-tracker-service
+```
+
+Persist processes across reboot:
+
+```bash
+pm2 save
+pm2 startup
+```
+
+If you update code:
+
+```bash
+npm run build
+pm2 restart game-tracker-service
+```
 
 ### Docker
 
@@ -571,6 +611,44 @@ Stored in `audit_log` with a **180-day TTL index**.
 ## Ingestion & Providers
 
 The ingestion pipeline runs automatically at **03:00 UTC on the 1st and 15th** of each month, and can also be triggered on-demand via `POST /ingest/run`.
+
+### Host Cron Trigger
+
+If you want scheduling outside the app runtime, use the cron-safe helper script:
+
+```bash
+npm run ingest:trigger
+```
+
+The helper script is at `scripts/trigger-ingestion.sh` and includes:
+
+- Required auth check for `ADMIN_API_KEY`
+- Non-blocking overlap protection with `flock` (if available)
+- Configurable timeout via `INGEST_HTTP_TIMEOUT_SEC`
+- Optional env-file loading via `INGEST_CRON_ENV_FILE`
+
+Recommended secure env file for cron (`/etc/game-tracker-ingest.env`, `chmod 600`):
+
+```bash
+ADMIN_API_KEY=replace-with-real-key
+INGEST_BASE_URL=http://127.0.0.1:3000
+INGEST_ENDPOINT=/ingest/run
+INGEST_HTTP_TIMEOUT_SEC=90
+```
+
+Example cron entry (daily at 02:00 UTC):
+
+```cron
+0 2 * * * cd /path/to/Game-Tracker-Service && INGEST_CRON_ENV_FILE=/etc/game-tracker-ingest.env npm run ingest:trigger >> /var/log/game-tracker-ingest.log 2>&1
+```
+
+If you want to run only on Mondays and Thursdays:
+
+```cron
+0 2 * * 1,4 cd /path/to/Game-Tracker-Service && INGEST_CRON_ENV_FILE=/etc/game-tracker-ingest.env npm run ingest:trigger >> /var/log/game-tracker-ingest.log 2>&1
+```
+
+Keep schedules non-overlapping with the built-in in-app cron unless you intentionally want both.
 
 ### Providers
 

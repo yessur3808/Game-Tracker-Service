@@ -1,8 +1,10 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./modules/app.module";
 import { AllExceptionsFilter } from "./shared/all-exceptions.filter";
+
+const logger = new Logger("Bootstrap");
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,11 +31,9 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, "0.0.0.0");
-  // eslint-disable-next-line no-console
-  console.log(`Listening on http://localhost:${port}`);
+  logger.log(`Listening on http://localhost:${port}`);
 }
 bootstrap().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(err);
+  logger.error("Bootstrap failed", err instanceof Error ? err.stack : String(err));
   process.exit(1);
 });
